@@ -4,6 +4,7 @@ import { CategoryScoreList } from '@/components/analysis/CategoryScoreList';
 import { Card } from '@/components/ui';
 import { labelForAnalysisMode } from '@/lib/constants';
 import { formatReportDate } from '@/lib/format';
+import { reportSourceLabel, reportOverallScoreLabel, isGeminiAnalysedReport, resolveReportSource } from '@/lib/reportSource';
 import type { CoachingReport } from '@/types/analysis';
 
 interface ReportDetailViewProps {
@@ -14,15 +15,34 @@ interface ReportDetailViewProps {
 
 export function ReportDetailView({ report, bottomPadding = 24, footer }: ReportDetailViewProps) {
   const clipLabel = report.clip.fileName ?? 'Selected clip';
+  const source = resolveReportSource(report);
+  const sourceLabel = reportSourceLabel(report);
 
   return (
     <ScrollView
       contentContainerStyle={{ paddingBottom: bottomPadding, gap: 16 }}
       showsVerticalScrollIndicator={false}
     >
-      <View className="bg-primary-muted border border-primary/30 rounded-xl px-4 py-3 flex-row items-center gap-2">
-        <Ionicons name="information-circle-outline" size={18} color="#00C853" />
-        <Text className="text-text-secondary text-sm flex-1 leading-5">Demo Report</Text>
+      <View
+        className={`rounded-xl px-4 py-3 gap-1 border ${
+          source === 'gemini'
+            ? 'bg-primary-muted border-primary/30'
+            : 'bg-surface-elevated border-border'
+        }`}
+      >
+        <View className="flex-row items-center gap-2">
+          <Ionicons
+            name={source === 'gemini' ? 'videocam-outline' : 'flask-outline'}
+            size={18}
+            color={source === 'gemini' ? '#00C853' : '#9E9E9E'}
+          />
+          <Text className="text-text-secondary text-sm flex-1 leading-5">{sourceLabel}</Text>
+        </View>
+        {source === 'demo' && report.analysisFallbackReason ? (
+          <Text className="text-text-muted text-xs leading-4 pl-[26px]">
+            Reason: {report.analysisFallbackReason}
+          </Text>
+        ) : null}
       </View>
 
       <Card variant="elevated" className="gap-3">
@@ -89,6 +109,8 @@ function PerformanceSections({
 }: {
   report: Extract<CoachingReport, { mode: 'PERFORMANCE' }>;
 }) {
+  const aiAnalysed = isGeminiAnalysedReport(report);
+
   return (
     <>
       <ReportSection title="Category scores">
@@ -96,6 +118,8 @@ function PerformanceSections({
           categories={report.categories}
           showOverall
           overallScore={report.overallScore}
+          overallLabel={reportOverallScoreLabel(report)}
+          isAiAnalysed={aiAnalysed}
         />
       </ReportSection>
 
@@ -127,6 +151,8 @@ function PerformanceSections({
 }
 
 function GoalSections({ report }: { report: Extract<CoachingReport, { mode: 'GOAL' }> }) {
+  const aiAnalysed = isGeminiAnalysedReport(report);
+
   return (
     <>
       <ReportSection title="Ratings">
@@ -134,7 +160,8 @@ function GoalSections({ report }: { report: Extract<CoachingReport, { mode: 'GOA
           categories={report.categories}
           showOverall
           overallScore={report.overallScore}
-          overallLabel="Demo Score"
+          overallLabel={reportOverallScoreLabel(report)}
+          isAiAnalysed={aiAnalysed}
         />
       </ReportSection>
 

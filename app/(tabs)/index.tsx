@@ -14,6 +14,7 @@ import {
 } from '@/lib/constants';
 import { getLatestReport, useAnalysisStore } from '@/stores/analysisStore';
 import { getRemainingAnalyses, useProfileStore } from '@/stores/profileStore';
+import { isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function HomeScreen() {
   const trainingFocus = profile?.improvementGoals.slice(0, 2) ?? [];
 
   const handleUpload = () => {
-    if (remaining <= 0) return;
+    if (!isDevUnlimitedAnalyses() && remaining <= 0) return;
     router.push('/(upload)');
   };
 
@@ -54,31 +55,41 @@ export default function HomeScreen() {
           <Card variant="elevated" className="flex-row items-center justify-between">
             <View className="flex-1 pr-4">
               <Text className="text-text-primary font-semibold text-base mb-1">Analyses this month</Text>
-              <Text className="text-text-secondary text-sm">
-                {remaining} of {FREE_TIER_ANALYSES_PER_MONTH} remaining
-              </Text>
+              {isDevUnlimitedAnalyses() ? (
+                <Text className="text-text-secondary text-sm">Dev: unlimited analyses</Text>
+              ) : (
+                <Text className="text-text-secondary text-sm">
+                  {remaining} of {FREE_TIER_ANALYSES_PER_MONTH} remaining
+                </Text>
+              )}
             </View>
-            <View className="bg-primary-muted px-3 py-1.5 rounded-full">
-              <Text className="text-primary text-sm font-semibold">{remaining} left</Text>
-            </View>
+            {!isDevUnlimitedAnalyses() ? (
+              <View className="bg-primary-muted px-3 py-1.5 rounded-full">
+                <Text className="text-primary text-sm font-semibold">{remaining} left</Text>
+              </View>
+            ) : (
+              <View className="bg-primary-muted px-3 py-1.5 rounded-full">
+                <Text className="text-primary text-xs font-semibold">DEV</Text>
+              </View>
+            )}
           </Card>
 
           <Button
             label="Upload a clip"
             onPress={handleUpload}
-            disabled={remaining <= 0}
+            disabled={!isDevUnlimitedAnalyses() && remaining <= 0}
             fullWidth
             size="lg"
           />
 
-          {remaining <= 0 ? (
+          {!isDevUnlimitedAnalyses() && remaining <= 0 ? (
             <Text className="text-text-muted text-sm text-center -mt-2">
               You have used all free analyses this month.
             </Text>
           ) : null}
 
           <Pressable
-            onPress={() => router.push('/hall-of-fame')}
+            onPress={() => router.push('/(tabs)/hall-of-fame')}
             className="active:opacity-80"
           >
             <Card variant="outlined" className="flex-row items-center gap-4 border-primary/20 bg-primary-muted/10">

@@ -56,10 +56,14 @@ export function determineGoalAward(categories: ScoredCategory[]): GoalAward {
   return createGoalAward(type);
 }
 
-export function buildGoalScore(overall: number, categories: ScoredCategory[]): GoalScore {
+export function buildGoalScore(
+  overall: number,
+  categories: ScoredCategory[],
+  isDemo = true
+): GoalScore {
   return {
     overall,
-    isDemo: true,
+    isDemo,
     categories,
   };
 }

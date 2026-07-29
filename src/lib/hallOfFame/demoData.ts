@@ -40,6 +40,7 @@ function demoSubmission(params: {
   overall: number;
   categories: GoalSubmission['score']['categories'];
   awardType: Parameters<typeof createGoalAward>[0];
+  playTitle: string;
   daysAgo: number;
 }): GoalSubmission {
   const categories = params.categories;
@@ -50,9 +51,13 @@ function demoSubmission(params: {
     reportId: `demo-report-${params.id}`,
     clipUri: `demo://clip/${params.id}`,
     thumbnailTimestampMs: 1200,
+    thumbnailFocalY: 0.38,
     playerName: params.playerName,
     position: params.position,
     positionLabel: params.positionLabel,
+    playTitle: params.playTitle,
+    summary: `An exceptional ${params.playTitle.toLowerCase()} rated ${params.overall.toFixed(1)}/10.`,
+    analysisMode: 'GOAL',
     score: buildGoalScore(params.overall, categories),
     award,
     submittedAt: new Date(Date.now() - params.daysAgo * 86_400_000).toISOString(),
@@ -69,6 +74,7 @@ export const DEMO_HALL_OF_FAME_SUBMISSIONS: GoalSubmission[] = [
     positionLabel: 'Striker',
     overall: 9.1,
     awardType: 'ICE_COLD_FINISH',
+    playTitle: 'Top Corner Finish',
     daysAgo: 2,
     categories: [
       { key: 'FINISH', label: 'Finish', score: 9.2 },
@@ -86,6 +92,7 @@ export const DEMO_HALL_OF_FAME_SUBMISSIONS: GoalSubmission[] = [
     positionLabel: 'Winger',
     overall: 8.8,
     awardType: 'ROCKET_STRIKE',
+    playTitle: 'Long Range Strike',
     daysAgo: 1,
     categories: [
       { key: 'FINISH', label: 'Finish', score: 8.9 },
@@ -103,6 +110,7 @@ export const DEMO_HALL_OF_FAME_SUBMISSIONS: GoalSubmission[] = [
     positionLabel: 'Attacking midfielder',
     overall: 8.6,
     awardType: 'CREATIVE_GENIUS',
+    playTitle: 'Skill Move Goal',
     daysAgo: 3,
     categories: [
       { key: 'FINISH', label: 'Finish', score: 8.2 },
@@ -120,6 +128,7 @@ export const DEMO_HALL_OF_FAME_SUBMISSIONS: GoalSubmission[] = [
     positionLabel: 'Striker',
     overall: 8.4,
     awardType: 'TOP_CORNER_PRECISION',
+    playTitle: 'Top Corner Finish',
     daysAgo: 4,
     categories: [
       { key: 'FINISH', label: 'Finish', score: 9.1 },
@@ -137,6 +146,7 @@ export const DEMO_HALL_OF_FAME_SUBMISSIONS: GoalSubmission[] = [
     positionLabel: 'Central midfielder',
     overall: 8.2,
     awardType: 'PERFECT_TEAM_GOAL',
+    playTitle: 'One-Two Finish',
     daysAgo: 1,
     categories: [
       { key: 'FINISH', label: 'Finish', score: 8.0 },
@@ -154,6 +164,7 @@ export const DEMO_HALL_OF_FAME_SUBMISSIONS: GoalSubmission[] = [
     positionLabel: 'Winger',
     overall: 8.0,
     awardType: 'ELITE_DECISION',
+    playTitle: 'Outside-of-the-Boot Assist',
     daysAgo: 5,
     categories: [
       { key: 'FINISH', label: 'Finish', score: 7.8 },
@@ -196,10 +207,13 @@ export function toTrendingEntries(
   }));
 }
 
-/** Recompute award from categories when loading user submissions. */
 export function normalizeUserSubmission(submission: GoalSubmission): GoalSubmission {
   return {
     ...submission,
+    playTitle: submission.playTitle ?? submission.award?.label ?? 'Standout Moment',
+    summary: submission.summary ?? '',
+    analysisMode: submission.analysisMode ?? 'GOAL',
+    thumbnailFocalY: submission.thumbnailFocalY ?? 0.38,
     award: determineGoalAward(submission.score.categories),
   };
 }

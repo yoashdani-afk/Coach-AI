@@ -3,6 +3,8 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { PlayerProfile } from '@/types/profile';
 import { FREE_TIER_ANALYSES_PER_MONTH } from '@/lib/constants';
+import { isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
+import { useAnalysisCreditsStore } from '@/stores/analysisCreditsStore';
 
 interface ProfileState {
   hasSeenOnboarding: boolean;
@@ -12,7 +14,9 @@ interface ProfileState {
   setHasSeenOnboarding: (value: boolean) => void;
   setSignedIn: (value: boolean) => void;
   setProfile: (profile: PlayerProfile) => void;
-  incrementAnalysesUsed: () => void;
+  /** Consume one free credit for a successful Gemini analysis (production only). */
+  consumeAnalysisCreditForAttempt: (attemptId: string) => boolean;
+  resetFreeAnalyses: () => void;
   clearProfile: () => void;
   resetAll: () => void;
   setHasHydrated: (value: boolean) => void;
@@ -20,7 +24,7 @@ interface ProfileState {
 
 export const useProfileStore = create<ProfileState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       hasSeenOnboarding: false,
       isSignedIn: false,
       profile: null,
@@ -28,20 +32,61 @@ export const useProfileStore = create<ProfileState>()(
       setHasSeenOnboarding: (value) => set({ hasSeenOnboarding: value }),
       setSignedIn: (value) => set({ isSignedIn: value }),
       setProfile: (profile) => set({ profile, isSignedIn: true }),
-      incrementAnalysesUsed: () =>
-        set((state) => {
-          if (!state.profile) return state;
-          return {
-            profile: {
-              ...state.profile,
-              analysesUsedThisMonth: Math.min(
-                FREE_TIER_ANALYSES_PER_MONTH,
-                state.profile.analysesUsedThisMonth + 1
-              ),
-              updatedAt: new Date().toISOString(),
-            },
-          };
-        }),
+
+      consumeAnalysisCreditForAttempt: (attemptId) => {
+        if (isDevUnlimitedAnalyses()) {
+          console.log('[Credits] Dev mode — skipping credit consumption', { attemptId });
+          return false;
+        }
+
+        const credits = useAnalysisCreditsStore.getState();
+        if (credits.hasAttemptConsumed(attemptId)) {
+          console.log('[Credits] Attempt already charged — skipping duplicate', { attemptId });
+          return false;
+        }
+
+        const profile = get().profile;
+        if (!profile) return false;
+
+        if (profile.analysesUsedThisMonth >= FREE_TIER_ANALYSES_PER_MONTH) {
+          console.warn('[Credits] No free analyses remaining', { attemptId });
+          return false;
+        }
+
+        credits.markAttemptConsumed(attemptId);
+        set({
+          profile: {
+            ...profile,
+            analysesUsedThisMonth: Math.min(
+              FREE_TIER_ANALYSES_PER_MONTH,
+              profile.analysesUsedThisMonth + 1
+            ),
+            updatedAt: new Date().toISOString(),
+          },
+        });
+
+        console.log('[Credits] Consumed one free analysis', {
+          attemptId,
+          used: get().profile?.analysesUsedThisMonth,
+        });
+        return true;
+      },
+
+      resetFreeAnalyses: () => {
+        const profile = get().profile;
+        if (!profile) return;
+
+        set({
+          profile: {
+            ...profile,
+            analysesUsedThisMonth: 0,
+            updatedAt: new Date().toISOString(),
+          },
+        });
+        useAnalysisCreditsStore.getState().resetConsumedAttempts();
+        console.log('[Credits] Free analyses reset to', FREE_TIER_ANALYSES_PER_MONTH);
+      },
+
       clearProfile: () => set({ profile: null }),
       resetAll: () =>
         set({
@@ -66,10 +111,7 @@ export const useProfileStore = create<ProfileState>()(
   )
 );
 
-export function getRemainingAnalyses(profile: PlayerProfile | null): number {
-  if (!profile) return 3;
-  return Math.max(0, 3 - profile.analysesUsedThisMonth);
-}
+export { getRemainingAnalyses, canStartAnalysis, remainingAnalysesLabel, isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
 
 export function hasCompleteProfile(profile: PlayerProfile | null): boolean {
   return profile?.isComplete === true;

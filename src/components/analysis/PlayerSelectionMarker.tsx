@@ -1,62 +1,56 @@
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
 
 interface PlayerSelectionMarkerProps {
   x: number;
   y: number;
 }
 
+/** Corner bracket + dot — marker offset so kit/body stays visible. */
 export function PlayerSelectionMarker({ x, y }: PlayerSelectionMarkerProps) {
-  const size = 22;
+  const bracket = 16;
+  const stroke = 3;
+  const dot = 5;
+  const bracketLeft = x + 10;
+  const bracketTop = y - 36;
 
   return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        left: x - size,
-        top: y - size,
-        width: size * 2,
-        height: size * 2 + 18,
-        alignItems: 'center',
-      }}
-    >
+    <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
       <View
         style={{
-          width: size * 2,
-          height: size * 2,
-          borderRadius: size,
-          borderWidth: 3,
+          position: 'absolute',
+          left: bracketLeft,
+          top: bracketTop,
+          width: bracket,
+          height: bracket,
+          borderTopWidth: stroke,
+          borderLeftWidth: stroke,
           borderColor: '#00C853',
-          backgroundColor: 'rgba(0, 200, 83, 0.25)',
-          alignItems: 'center',
-          justifyContent: 'center',
         }}
-      >
-        <View
-          style={{
-            width: size * 2 + 12,
-            height: size * 2 + 12,
-            borderRadius: size + 6,
-            borderWidth: 2,
-            borderColor: 'rgba(0, 200, 83, 0.45)',
-            position: 'absolute',
-          }}
-        />
-        <View
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            backgroundColor: '#00C853',
-          }}
-        />
-      </View>
-      <Text
-        className="text-primary text-xs font-bold mt-1"
-        style={{ textShadowColor: '#000', textShadowRadius: 4, textShadowOffset: { width: 0, height: 1 } }}
-      >
-        You
-      </Text>
+      />
+      <View
+        style={{
+          position: 'absolute',
+          left: bracketLeft + bracket - stroke,
+          top: bracketTop + bracket - stroke / 2,
+          width: Math.max(12, x - (bracketLeft + bracket) + stroke),
+          height: stroke,
+          backgroundColor: '#00C853',
+          transform: [{ rotate: '32deg' }],
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          left: x - dot,
+          top: y - dot,
+          width: dot * 2,
+          height: dot * 2,
+          borderRadius: dot,
+          backgroundColor: '#00C853',
+          borderWidth: 2,
+          borderColor: '#FFFFFF',
+        }}
+      />
     </View>
   );
 }

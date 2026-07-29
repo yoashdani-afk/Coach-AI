@@ -1,4 +1,4 @@
-import type { ScoredCategory } from '@/types/analysis';
+import type { AnalysisMode, ScoredCategory } from '@/types/analysis';
 import type { Position } from '@/types/profile';
 
 export type GoalCategoryKey =
@@ -19,7 +19,7 @@ export type GoalAwardType =
 
 export interface GoalScore {
   overall: number;
-  isDemo: true;
+  isDemo: boolean;
   categories: ScoredCategory[];
 }
 
@@ -34,13 +34,21 @@ export interface GoalSubmission {
   reportId: string;
   clipUri: string;
   thumbnailTimestampMs: number;
+  /** Normalised Y (0–1) for thumbnail cover focal point — centres on the player. */
+  thumbnailFocalY?: number;
   playerName: string;
   position: Position;
   positionLabel: string;
+  /** Memorable play title, e.g. "Bicycle Kick". */
+  playTitle: string;
+  /** Analysis summary shown in the Hall of Fame list. */
+  summary: string;
+  analysisMode: AnalysisMode;
   score: GoalScore;
   award: GoalAward;
   submittedAt: string;
   source: 'user' | 'demo';
+  autoInducted?: boolean;
 }
 
 export interface LeaderboardEntry {
@@ -59,7 +67,15 @@ export interface Challenge {
   status: ChallengeStatus;
 }
 
-export type SubmitGoalResult = { ok: true } | { ok: false; reason: 'duplicate' | 'invalid_report' };
+export type SubmitGoalResult =
+  | { ok: true; playTitle?: string }
+  | { ok: false; reason: 'duplicate' | 'invalid_report' };
+
+export interface HallOfFameUnlockPreview {
+  reportId: string;
+  playTitle: string;
+  reasons: string[];
+}
 
 export interface HallOfFameRepository {
   getHighestRated(limit?: number): LeaderboardEntry[];

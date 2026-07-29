@@ -12,6 +12,8 @@ import {
   labelForPosition,
 } from '@/lib/constants';
 import { useProfileStore } from '@/stores/profileStore';
+import { FREE_TIER_ANALYSES_PER_MONTH } from '@/lib/constants';
+import { getRemainingAnalyses, isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
 
 function ProfileRow({ label, value }: { label: string; value: string }) {
   return (
@@ -27,6 +29,22 @@ export default function ProfileScreen() {
   const router = useRouter();
   const profile = useProfileStore((s) => s.profile);
   const resetAll = useProfileStore((s) => s.resetAll);
+  const resetFreeAnalyses = useProfileStore((s) => s.resetFreeAnalyses);
+  const remaining = getRemainingAnalyses(profile);
+
+  const handleResetFreeAnalyses = () => {
+    Alert.alert(
+      'Reset free analyses',
+      `Restore your remaining free analyses to ${FREE_TIER_ANALYSES_PER_MONTH}. Development only.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          onPress: () => resetFreeAnalyses(),
+        },
+      ]
+    );
+  };
 
   const handleReset = () => {
     Alert.alert(
@@ -79,6 +97,17 @@ export default function ProfileScreen() {
         </Card>
 
         <Card variant="outlined">
+          <Text className="text-text-muted text-xs uppercase tracking-wider mb-2">Usage</Text>
+          {isDevUnlimitedAnalyses() ? (
+            <Text className="text-text-secondary text-sm">Dev: unlimited analyses</Text>
+          ) : (
+            <Text className="text-text-secondary text-sm">
+              {remaining} of {FREE_TIER_ANALYSES_PER_MONTH} free analyses remaining this month
+            </Text>
+          )}
+        </Card>
+
+        <Card variant="outlined">
           <Text className="text-text-muted text-xs uppercase tracking-wider mb-2">Details</Text>
           <ProfileRow label="Age" value={String(profile.age)} />
           <ProfileRow label="Country" value={profile.country} />
@@ -126,6 +155,22 @@ export default function ProfileScreen() {
             fullWidth
             onPress={() => router.push('/(onboarding)/setup?edit=1')}
           />
+          {__DEV__ ? (
+            <>
+              <Button
+                label="Reset free analyses"
+                variant="secondary"
+                fullWidth
+                onPress={handleResetFreeAnalyses}
+              />
+              <Button
+                label="Marker preview (debug)"
+                variant="secondary"
+                fullWidth
+                onPress={() => router.push('/debug/marker-preview')}
+              />
+            </>
+          ) : null}
           <Button label="Reset profile (testing)" variant="ghost" fullWidth onPress={handleReset} />
         </View>
 

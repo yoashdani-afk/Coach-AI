@@ -7,7 +7,10 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "server:install": "npm install --prefix server",
+    "server:dev": "npm run dev --prefix server",
+    "server:typecheck": "npm run typecheck --prefix server"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -38,6 +41,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@expo/ngrok": "^4.1.3",
     "@types/react": "~19.1.0",
     "babel-preset-expo": "~54.0.10",
     "react-test-renderer": "19.1.0",

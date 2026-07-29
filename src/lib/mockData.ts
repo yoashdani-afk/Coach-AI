@@ -2,7 +2,7 @@ export const EXAMPLE_ANALYSIS = {
   id: 'example',
   title: 'Coach Me',
   summary:
-    'Mostly yes — your idea to play forward was good, but one extra scan would have confirmed the pass was on.',
+    'What happened: you opened on the half-turn and played forward as the pressing trigger activated. Why it mattered: one pre-contact scan would have confirmed whether the weak-side lane was still open before you committed.',
   dateLabel: 'Example report',
   isExample: true as const,
 };

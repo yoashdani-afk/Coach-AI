@@ -16,6 +16,7 @@ import {
   initialSeekSeconds,
   normalizedToContainer,
   tapToNormalized,
+  assessTrackingQuality,
 } from '@/lib/videoLayout';
 import type { PlayerSelection } from '@/types/analysis';
 
@@ -52,6 +53,9 @@ export function PlayerSelectionFrame({
   );
   const [showScrubber, setShowScrubber] = useState(false);
   const [scrubWidth, setScrubWidth] = useState(0);
+  const [reducedTrackingConfidence, setReducedTrackingConfidence] = useState(
+    initialSelection?.reducedTrackingConfidence ?? false
+  );
   const hasSeeked = useRef(false);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -95,6 +99,7 @@ export function PlayerSelectionFrame({
         : null
     );
     setTimestampMs(initialSelection?.timestampMs ?? 0);
+    setReducedTrackingConfidence(initialSelection?.reducedTrackingConfidence ?? false);
   }, [uri, initialSelection]);
 
   useEffect(() => {
@@ -153,20 +158,41 @@ export function PlayerSelectionFrame({
     return normalizedToContainer(normalized.x, normalized.y, contentRect);
   }, [normalized, contentRect]);
 
+  const trackingQualityWarning = useMemo(() => {
+    if (!normalized || contentRect.width <= 0) return false;
+    return assessTrackingQuality(normalized.x, normalized.y, contentRect);
+  }, [normalized, contentRect]);
+
+  const zoomMagnification = 2.8;
+  const zoomWindowSize = 112;
+
   const emitSelection = useCallback(
-    (nextNormalized: { x: number; y: number }, nextTimestampMs: number) => {
+    (nextNormalized: { x: number; y: number }, nextTimestampMs: number, reduced = reducedTrackingConfidence) => {
       if (contentRect.width <= 0 || contentRect.height <= 0) return;
 
+      const warning = assessTrackingQuality(nextNormalized.x, nextNormalized.y, contentRect);
       const selection: PlayerSelection = {
         normalizedX: nextNormalized.x,
         normalizedY: nextNormalized.y,
         timestampMs: nextTimestampMs,
         displayWidth: contentRect.width,
         displayHeight: contentRect.height,
+        ...(videoSize.width > 0 && videoSize.height > 0
+          ? { videoWidth: videoSize.width, videoHeight: videoSize.height }
+          : {}),
+        ...(warning ? { trackingQualityWarning: true } : {}),
+        ...(reduced ? { reducedTrackingConfidence: true } : {}),
       };
       onSelectionChange(selection);
     },
-    [contentRect.width, contentRect.height, onSelectionChange]
+    [
+      contentRect.width,
+      contentRect.height,
+      onSelectionChange,
+      reducedTrackingConfidence,
+      videoSize.width,
+      videoSize.height,
+    ]
   );
 
   useEffect(() => {
@@ -189,7 +215,8 @@ export function PlayerSelectionFrame({
 
     const next = { x: mapped.normalizedX, y: mapped.normalizedY };
     setNormalized(next);
-    emitSelection(next, timestampMs);
+    setReducedTrackingConfidence(false);
+    emitSelection(next, timestampMs, false);
   };
 
   const seekToMs = (ms: number) => {
@@ -277,6 +304,89 @@ export function PlayerSelectionFrame({
           ) : null}
         </Pressable>
       </View>
+
+      {normalized && markerPosition && contentRect.width > 0 ? (
+        <Card variant="outlined" className="gap-3">
+          <Text className="text-text-primary text-sm font-semibold">Zoom preview</Text>
+          <View className="items-center">
+            <View
+              className="rounded-xl overflow-hidden border-2 border-primary bg-black"
+              style={{ width: zoomWindowSize, height: zoomWindowSize }}
+            >
+              <VideoView
+                player={player}
+                style={{
+                  width: contentRect.width * zoomMagnification,
+                  height: contentRect.height * zoomMagnification,
+                  transform: [
+                    {
+                      translateX:
+                        zoomWindowSize / 2 -
+                        (contentRect.x + normalized.x * contentRect.width) * zoomMagnification,
+                    },
+                    {
+                      translateY:
+                        zoomWindowSize / 2 -
+                        (contentRect.y + normalized.y * contentRect.height) * zoomMagnification,
+                    },
+                  ],
+                }}
+                contentFit="contain"
+                nativeControls={false}
+              />
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: zoomWindowSize / 2 - 6,
+                  top: zoomWindowSize / 2 - 6,
+                  width: 12,
+                  height: 12,
+                  borderRadius: 6,
+                  borderWidth: 2,
+                  borderColor: '#00C853',
+                }}
+              />
+            </View>
+          </View>
+          <Text className="text-text-muted text-xs text-center leading-5">
+            Tap again on the main frame to adjust your selection, or scrub to a clearer moment.
+          </Text>
+        </Card>
+      ) : null}
+
+      {trackingQualityWarning ? (
+        <Card variant="outlined" className="gap-3 border-amber-500/40 bg-amber-500/5">
+          <Text className="text-amber-200 text-sm font-semibold leading-5">
+            Player is difficult to identify in this frame. Choose a clearer moment for more accurate
+            tracking.
+          </Text>
+          <Text className="text-text-secondary text-sm leading-5">
+            You can pick a different moment, tap again to refine your selection, or continue with
+            reduced tracking confidence.
+          </Text>
+          <View className="flex-row gap-2">
+            <Button
+              label="Choose clearer moment"
+              variant="secondary"
+              size="sm"
+              className="flex-1"
+              onPress={() => setShowScrubber(true)}
+            />
+            <Button
+              label="Continue anyway"
+              size="sm"
+              className="flex-1"
+              onPress={() => {
+                setReducedTrackingConfidence(true);
+                if (normalized) {
+                  emitSelection(normalized, timestampMs, true);
+                }
+              }}
+            />
+          </View>
+        </Card>
+      ) : null}
 
       <Card variant="outlined" className="flex-row gap-3 items-start">
         <Text className="text-lg">👆</Text>

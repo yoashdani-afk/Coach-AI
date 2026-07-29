@@ -7,14 +7,14 @@ import { Button } from '@/components/ui';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { pickVideoFromLibrary, getICloudNotDownloadedMessage } from '@/lib/videoPicker';
 import { FREE_TIER_ANALYSES_PER_MONTH } from '@/lib/constants';
+import { canStartAnalysis, remainingAnalysesLabel } from '@/lib/analysisCredits';
 import { useAnalysisStore } from '@/stores/analysisStore';
-import { getRemainingAnalyses, hasCompleteProfile, useProfileStore } from '@/stores/profileStore';
+import { hasCompleteProfile, useProfileStore } from '@/stores/profileStore';
 import { useUploadStore } from '@/stores/uploadStore';
 
 export default function PickClipScreen() {
   const router = useRouter();
   const profile = useProfileStore((s) => s.profile);
-  const remaining = getRemainingAnalyses(profile);
   const isAnalysing = useAnalysisStore((s) => s.isAnalysing);
   const clearDraft = useUploadStore((s) => s.clearDraft);
   const setClip = useUploadStore((s) => s.setClip);
@@ -25,7 +25,7 @@ export default function PickClipScreen() {
       Alert.alert('Analysis in progress', 'Please wait for your current analysis to finish.');
       return;
     }
-    if (remaining <= 0) {
+    if (!canStartAnalysis(profile)) {
       Alert.alert(
         'No analyses remaining',
         `You have used all ${FREE_TIER_ANALYSES_PER_MONTH} free analyses this month.`
@@ -106,7 +106,7 @@ export default function PickClipScreen() {
           </Text>
           <Text className="text-text-muted text-sm text-center leading-5">
             Video only · 10 seconds to 5 minutes{'\n'}
-            {remaining} of {FREE_TIER_ANALYSES_PER_MONTH} analyses left this month
+            {remainingAnalysesLabel(profile)}
           </Text>
         </Pressable>
       </View>

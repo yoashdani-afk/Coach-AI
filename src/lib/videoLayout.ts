@@ -84,3 +84,25 @@ export function initialSeekSeconds(durationSeconds: number): number {
   if (durationSeconds <= 0) return 0;
   return Math.min(1, durationSeconds * 0.08);
 }
+
+/** Heuristic: player likely small, distant, or hard to track in this frame. */
+export function assessTrackingQuality(
+  normalizedX: number,
+  normalizedY: number,
+  contentRect: ContentRect
+): boolean {
+  if (contentRect.width <= 0 || contentRect.height <= 0) return false;
+
+  const minDim = Math.min(contentRect.width, contentRect.height);
+  const cropPx = minDim * 0.28;
+  const nearEdge =
+    normalizedX < 0.06 ||
+    normalizedX > 0.94 ||
+    normalizedY < 0.06 ||
+    normalizedY > 0.94;
+  const distantInFrame = normalizedY < 0.38;
+  const lowPreviewResolution = minDim < 260;
+  const tinyCropRegion = cropPx < 56;
+
+  return nearEdge || distantInFrame || lowPreviewResolution || tinyCropRegion;
+}

@@ -10,6 +10,7 @@ import { isDevPreviewMode, isSupabaseConfigured, supabase } from '@/lib/supabase
 import { useAuthStore } from '@/stores/authStore';
 import { useProfileStore, hasCompleteProfile } from '@/stores/profileStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
+import { useAnalysisCreditsStore } from '@/stores/analysisCreditsStore';
 
 function useProtectedRoute() {
   const { session, isLoading } = useAuthStore();
@@ -43,11 +44,19 @@ function useProtectedRoute() {
 export default function RootLayout() {
   const { setSession, setLoading, isLoading } = useAuthStore();
   const hasHydrated = useProfileStore((s) => s.hasHydrated);
+  const creditsHydrated = useAnalysisCreditsStore((s) => s.hasHydrated);
+  const devCreditsMigrationDone = useAnalysisCreditsStore((s) => s.devCreditsMigrationDone);
   useProtectedRoute();
 
   useEffect(() => {
     useAnalysisStore.getState().setIsAnalysing(false);
   }, []);
+
+  useEffect(() => {
+    if (!__DEV__ || !hasHydrated || !creditsHydrated || devCreditsMigrationDone) return;
+    useProfileStore.getState().resetFreeAnalyses();
+    useAnalysisCreditsStore.setState({ devCreditsMigrationDone: true });
+  }, [hasHydrated, creditsHydrated, devCreditsMigrationDone]);
 
   useEffect(() => {
     if (isDevPreviewMode || !isSupabaseConfigured || !supabase) {
@@ -68,7 +77,7 @@ export default function RootLayout() {
     return () => subscription.unsubscribe();
   }, [setSession, setLoading]);
 
-  if (isLoading || !hasHydrated) {
+  if (isLoading || !hasHydrated || !creditsHydrated) {
     return (
       <View className="flex-1 bg-background items-center justify-center">
         <ActivityIndicator size="large" color="#00C853" />
@@ -90,6 +99,7 @@ export default function RootLayout() {
           <Stack.Screen name="hall-of-fame/index" />
           <Stack.Screen name="report/[id]" />
           <Stack.Screen name="reports/history" />
+          <Stack.Screen name="debug" options={{ presentation: 'modal' }} />
           <Stack.Screen name="+not-found" />
         </Stack>
       </SafeAreaProvider>

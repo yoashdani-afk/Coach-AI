@@ -1,73 +1,58 @@
 import { useState } from 'react';
-import { View, Text, Alert } from 'react-native';
+import { View, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui';
+import { CoachChat } from '@/chat/CoachChat';
+import { HallOfFameCelebration } from '@/components/hallOfFame/HallOfFameCelebration';
 import { ReportDetailView } from '@/components/analysis/ReportDetailView';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
-import { determineGoalAward } from '@/lib/hallOfFame/goalAward';
 import { useHallOfFame } from '@/services/hallOfFame/hallOfFameService';
+import { useChargeAnalysisCreditOnReportOpen } from '@/hooks/useChargeAnalysisCreditOnReportOpen';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useProfileStore } from '@/stores/profileStore';
 import { useUploadStore } from '@/stores/uploadStore';
-import type { GoalReport } from '@/types/analysis';
 
 export default function ReportScreen() {
-  const { id, preview } = useLocalSearchParams<{ id: string; preview?: string }>();
+  const { id, preview, hof } = useLocalSearchParams<{ id: string; preview?: string; hof?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const savedReport = useAnalysisStore((s) => s.reports.find((r) => r.id === id));
   const pendingReport = useUploadStore((s) => s.pendingReport);
+  const pendingHallOfFameUnlock = useUploadStore((s) => s.pendingHallOfFameUnlock);
   const addReport = useAnalysisStore((s) => s.addReport);
   const profile = useProfileStore((s) => s.profile);
-  const incrementAnalysesUsed = useProfileStore((s) => s.incrementAnalysesUsed);
   const clearDraft = useUploadStore((s) => s.clearDraft);
-  const { isReportSubmitted, submitFromReport } = useHallOfFame();
-  const [submitted, setSubmitted] = useState(false);
+  const clearHallOfFameUnlock = useUploadStore((s) => s.clearHallOfFameUnlock);
+  const { isReportSubmitted, tryAutoInductFromReport } = useHallOfFame();
+  const [inductedOnSave, setInductedOnSave] = useState(false);
 
   const isPreview = preview === '1';
   const report = savedReport ?? (isPreview && pendingReport?.id === id ? pendingReport : null);
-  const isGoalReport = report?.mode === 'GOAL';
-  const goalReport = isGoalReport ? (report as GoalReport) : null;
-  const alreadySubmitted = goalReport ? isReportSubmitted(goalReport.id) || submitted : false;
-  const goalAward = goalReport ? determineGoalAward(goalReport.categories) : null;
+  useChargeAnalysisCreditOnReportOpen(report);
+  const inHallOfFame = report ? isReportSubmitted(report.id) || inductedOnSave : false;
+
+  const showHallOfFameCelebration =
+    (hof === '1' || pendingHallOfFameUnlock?.reportId === report?.id) && inHallOfFame;
+
+  const celebrationTitle = pendingHallOfFameUnlock?.playTitle;
 
   const handleSave = () => {
     if (!report || savedReport) return;
     addReport(report);
-    incrementAnalysesUsed();
-    clearDraft();
-    router.replace(`/report/${report.id}`);
-  };
 
-  const handleSubmitToHallOfFame = () => {
-    if (!goalReport || !profile) return;
-
-    const result = submitFromReport(goalReport, profile);
-    if (!result.ok) {
-      if (result.reason === 'duplicate') {
-        Alert.alert(
-          'Already submitted',
-          'This clip is already in your local Hall of Fame.',
-          [{ text: 'View Hall of Fame', onPress: () => router.push('/hall-of-fame') }]
-        );
-      }
-      return;
+    if (profile) {
+      const result = tryAutoInductFromReport(report, profile);
+      if (result.ok) setInductedOnSave(true);
     }
 
-    setSubmitted(true);
-    Alert.alert(
-      'Submitted to Hall of Fame',
-      `${goalAward?.emoji} ${goalAward?.label} — your goal is now in the local leaderboard.`,
-      [
-        { text: 'Stay here', style: 'cancel' },
-        { text: 'View Hall of Fame', onPress: () => router.push('/hall-of-fame') },
-      ]
-    );
+    clearDraft();
+    router.replace(`/report/${report.id}${inHallOfFame || inductedOnSave ? '?hof=1' : ''}`);
   };
 
   const handleAnalyzeAnother = () => {
     clearDraft();
+    clearHallOfFameUnlock();
     router.replace('/(upload)');
   };
 
@@ -84,46 +69,44 @@ export default function ReportScreen() {
   }
 
   const showPreviewActions = isPreview && !savedReport;
-  const showHallOfFameSubmit = isGoalReport && savedReport && !alreadySubmitted;
-  const showHallOfFameBadge = isGoalReport && alreadySubmitted;
 
-  const footer = showPreviewActions ? (
+  const footer = (
     <View className="gap-3 mt-2">
-      <Button label="Save report" onPress={handleSave} fullWidth size="lg" />
-      <Button
-        label="Analyze another clip"
-        variant="secondary"
-        onPress={handleAnalyzeAnother}
-        fullWidth
-      />
-    </View>
-  ) : (
-    <View className="gap-3 mt-2">
-      {showHallOfFameSubmit ? (
-        <Button
-          label="Submit to Hall of Fame"
-          onPress={handleSubmitToHallOfFame}
-          fullWidth
-          size="lg"
-        />
+      {showHallOfFameCelebration ? (
+        <HallOfFameCelebration playTitle={celebrationTitle} />
       ) : null}
-      {showHallOfFameBadge ? (
-        <View className="bg-primary-muted border border-primary/30 rounded-xl px-4 py-3 items-center gap-1">
-          <Text className="text-primary text-sm font-semibold">🏆 In Hall of Fame</Text>
+      <CoachChat report={report} />
+      {showPreviewActions ? (
+        <>
+          <Button label="Save report" onPress={handleSave} fullWidth size="lg" />
           <Button
-            label="View Hall of Fame"
-            variant="ghost"
-            onPress={() => router.push('/hall-of-fame')}
+            label="Analyze another clip"
+            variant="secondary"
+            onPress={handleAnalyzeAnother}
             fullWidth
           />
-        </View>
-      ) : null}
-      <Button
-        label="Analyze another clip"
-        variant="secondary"
-        onPress={handleAnalyzeAnother}
-        fullWidth
-      />
+        </>
+      ) : (
+        <>
+          {inHallOfFame ? (
+            <View className="bg-primary-muted border border-primary/30 rounded-xl px-4 py-3 items-center gap-1">
+              <Text className="text-primary text-sm font-semibold">🏆 In Hall of Fame</Text>
+              <Button
+                label="View Hall of Fame"
+                variant="ghost"
+                onPress={() => router.push('/(tabs)/hall-of-fame')}
+                fullWidth
+              />
+            </View>
+          ) : null}
+          <Button
+            label="Analyze another clip"
+            variant="secondary"
+            onPress={handleAnalyzeAnother}
+            fullWidth
+          />
+        </>
+      )}
     </View>
   );
 
@@ -138,11 +121,7 @@ export default function ReportScreen() {
       <View className="flex-1 px-4">
         <ReportDetailView
           report={report}
-          bottomPadding={
-            showPreviewActions || showHallOfFameSubmit
-              ? insets.bottom + 160
-              : insets.bottom + 24
-          }
+          bottomPadding={insets.bottom + (showPreviewActions ? 240 : 180)}
           footer={footer}
         />
       </View>

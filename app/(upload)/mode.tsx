@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,8 +18,13 @@ export default function ModeScreen() {
   const setAnalysisMode = useUploadStore((s) => s.setAnalysisMode);
   const setPlayerSelection = useUploadStore((s) => s.setPlayerSelection);
 
+  useEffect(() => {
+    if (!clip) {
+      router.replace('/(upload)');
+    }
+  }, [clip, router]);
+
   if (!clip) {
-    router.replace('/(upload)');
     return null;
   }
 

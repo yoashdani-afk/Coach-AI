@@ -6,6 +6,8 @@ interface CategoryScoreListProps {
   showOverall?: boolean;
   overallScore?: number;
   overallLabel?: string;
+  /** When true, hides the demo-only "Not AI analysed" badge. */
+  isAiAnalysed?: boolean;
 }
 
 export function CategoryScoreList({
@@ -13,6 +15,7 @@ export function CategoryScoreList({
   showOverall = false,
   overallScore,
   overallLabel = 'Overall',
+  isAiAnalysed = false,
 }: CategoryScoreListProps) {
   return (
     <View className="gap-3">
@@ -20,7 +23,7 @@ export function CategoryScoreList({
         <View className="flex-row items-center justify-between bg-surface-elevated rounded-xl px-4 py-3 border border-border">
           <View>
             <Text className="text-text-primary font-semibold">{overallLabel}</Text>
-            {overallLabel === 'Demo Score' ? (
+            {!isAiAnalysed && overallLabel === 'Demo Score' ? (
               <Text className="text-text-muted text-[10px] uppercase mt-0.5">Not AI analysed</Text>
             ) : null}
           </View>
