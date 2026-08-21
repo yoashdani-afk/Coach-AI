@@ -10,7 +10,7 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-function estimateBoxFromTap(normalizedX: number, normalizedY: number): TrackingBoundingBox {
+export function estimateBoxFromTap(normalizedX: number, normalizedY: number): TrackingBoundingBox {
   const height = clamp01(0.06 + (1 - clamp01(normalizedY)) * 0.16);
   const width = clamp01(height * 0.42);
   const x = clamp01(normalizedX - width / 2);
@@ -31,7 +31,7 @@ function asConfidence(value: unknown): number {
 
 function asState(value: unknown): TrackingState {
   const raw = String(value ?? '').toUpperCase();
-  if (raw === 'CONFIRMED' || raw === 'PROBABLE' || raw === 'LOST') return raw;
+  if (raw === 'CONFIRMED' || raw === 'PROBABLE' || raw === 'SEARCHING' || raw === 'LOST') return raw;
   return 'PROBABLE';
 }
 

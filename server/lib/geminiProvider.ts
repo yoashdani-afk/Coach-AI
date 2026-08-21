@@ -8,7 +8,7 @@ import {
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { ServerAnalysisError } from './analysisErrors.js';
+import { isServerAnalysisError, ServerAnalysisError } from './analysisErrors.js';
 import { buildSystemInstruction, buildUserPrompt } from './buildPrompt.js';
 import {
   detectRejectedField,
@@ -31,15 +31,19 @@ import {
 import {
   invalidateModelCache,
   normalizeModelId,
-  resolveAnalysisModel,
+  resolveLegacyAnalysisModel,
 } from './geminiModelResolver.js';
 import {
   extractPlayerGroundingFrames,
   logPlayerGroundingExtraction,
   type PlayerGroundingFramesResult,
 } from './playerFrameMarker.js';
-import { parseGeminiJson } from './parseResponse.js';
-import type { AnalysisRequestMetadata, AnalysisResponse } from './types.js';
+import { parseGeminiJson, uncertainAnalysisResponse } from './parseResponse.js';
+import type { AnalysisRequestMetadata, AnalyseVideoApiResponse } from './types.js';
+import { normalizeAnalysisVideo } from './normalizeAnalysisVideo.js';
+import { NARRATIVE_RETRY_SUFFIX } from './narrativeConsistency.js';
+import { resolveAnalysisPipeline } from './analysisPipelineConfig.js';
+import { analyseVideoWithDenseTimeline } from './denseTimelineAnalysis.js';
 
 const MAX_PROCESSING_WAIT_MS = 90_000;
 const FILE_POLL_MS = 2_000;
@@ -185,11 +189,12 @@ function buildContentParts(
   readyFile: { uri: string; mimeType: string },
   metadata: AnalysisRequestMetadata,
   groundingFrames: PlayerGroundingFramesResult,
-  attempt: GenerateContentAttemptOptions
+  attempt: GenerateContentAttemptOptions,
+  extraInstruction = ''
 ): Part[] {
   const referenceImages = collectReferenceImages(groundingFrames);
   const systemInstruction = buildSystemInstruction();
-  const userPrompt = buildUserPrompt(metadata, referenceImages.length);
+  const userPrompt = buildUserPrompt(metadata, referenceImages.length, extraInstruction);
   const promptText = attempt.inlineSystemInstruction
     ? `${systemInstruction}\n\n${userPrompt}`
     : userPrompt;
@@ -211,7 +216,8 @@ function buildGenerateContentPayload(
   readyFile: { uri: string; mimeType: string },
   metadata: AnalysisRequestMetadata,
   groundingFrames: PlayerGroundingFramesResult,
-  attempt: GenerateContentAttemptOptions
+  attempt: GenerateContentAttemptOptions,
+  extraInstruction = ''
 ): GenerateContentParameters {
   const systemInstruction = buildSystemInstruction();
 
@@ -231,7 +237,7 @@ function buildGenerateContentPayload(
     contents: [
       {
         role: 'user',
-        parts: buildContentParts(readyFile, metadata, groundingFrames, attempt),
+        parts: buildContentParts(readyFile, metadata, groundingFrames, attempt, extraInstruction),
       },
     ],
     config,
@@ -275,7 +281,8 @@ async function analyzeViaGenerateContent(
   modelName: string,
   readyFile: { uri: string; mimeType: string },
   metadata: AnalysisRequestMetadata,
-  groundingFrames: PlayerGroundingFramesResult
+  groundingFrames: PlayerGroundingFramesResult,
+  extraInstruction = ''
 ): Promise<string> {
   logGeminiModel(modelName, GEMINI_GENERATE_ENDPOINT);
 
@@ -290,7 +297,8 @@ async function analyzeViaGenerateContent(
       readyFile,
       metadata,
       groundingFrames,
-      defaultAttempt
+      defaultAttempt,
+      extraInstruction
     );
     return await callGenerateContent(ai, payload, defaultAttempt);
   } catch (firstError) {
@@ -317,7 +325,8 @@ async function analyzeViaGenerateContent(
         readyFile,
         metadata,
         groundingFrames,
-        inlineAttempt
+        inlineAttempt,
+        extraInstruction
       );
       return await callGenerateContent(ai, payload, inlineAttempt);
     }
@@ -332,12 +341,13 @@ async function analyzeViaInteractions(
   modelName: string,
   readyFile: { uri: string; mimeType: string },
   metadata: AnalysisRequestMetadata,
-  groundingFrames: PlayerGroundingFramesResult
+  groundingFrames: PlayerGroundingFramesResult,
+  extraInstruction = ''
 ): Promise<string> {
   logGeminiModel(modelName, INTERACTIONS_CREATE_ENDPOINT);
 
   const referenceImages = collectReferenceImages(groundingFrames);
-  const userPrompt = buildUserPrompt(metadata, referenceImages.length);
+  const userPrompt = buildUserPrompt(metadata, referenceImages.length, extraInstruction);
 
   const input: Array<
     | { type: 'image'; data: string; mime_type: string }
@@ -409,10 +419,18 @@ async function runAnalysisWithModel(
   modelName: string,
   readyFile: { uri: string; mimeType: string },
   metadata: AnalysisRequestMetadata,
-  groundingFrames: PlayerGroundingFramesResult
+  groundingFrames: PlayerGroundingFramesResult,
+  extraInstruction = ''
 ): Promise<string> {
   try {
-    return await analyzeViaGenerateContent(ai, modelName, readyFile, metadata, groundingFrames);
+    return await analyzeViaGenerateContent(
+      ai,
+      modelName,
+      readyFile,
+      metadata,
+      groundingFrames,
+      extraInstruction
+    );
   } catch (generateError) {
     logGeminiFailure({
       model: modelName,
@@ -431,20 +449,46 @@ async function runAnalysisWithModel(
     console.warn(
       '[Gemini] generateContent failed — retrying with interactions.create (same model, same file)'
     );
-    return analyzeViaInteractions(ai, modelName, readyFile, metadata, groundingFrames);
+    return analyzeViaInteractions(
+      ai,
+      modelName,
+      readyFile,
+      metadata,
+      groundingFrames,
+      extraInstruction
+    );
   }
 }
 
 /**
  * Sends the clip to Gemini for football coaching analysis.
- * Uses @google/genai with dynamic model discovery — no hardcoded model IDs.
+ * Routes to dense_timeline (default) or legacy pipeline via ANALYSIS_PIPELINE env.
  */
 export async function analyseVideoWithGemini(params: {
+  requestId: string;
   videoBuffer: Buffer;
   mimeType: string;
   originalName: string;
   metadata: AnalysisRequestMetadata;
-}): Promise<AnalysisResponse> {
+}): Promise<AnalyseVideoApiResponse> {
+  const pipeline = resolveAnalysisPipeline();
+  console.log('[Analysis] Pipeline', { mode: pipeline, requestId: params.requestId });
+
+  if (pipeline === 'dense_timeline') {
+    return analyseVideoWithDenseTimeline(params);
+  }
+
+  return analyseVideoWithGeminiLegacy(params);
+}
+
+/** Legacy single-pass video + sparse reference frame analysis. */
+async function analyseVideoWithGeminiLegacy(params: {
+  requestId: string;
+  videoBuffer: Buffer;
+  mimeType: string;
+  originalName: string;
+  metadata: AnalysisRequestMetadata;
+}): Promise<AnalyseVideoApiResponse> {
   const apiKey = getApiKey();
 
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'coach-ai-'));
@@ -458,12 +502,23 @@ export async function analyseVideoWithGemini(params: {
   try {
     await fs.writeFile(tempPath, params.videoBuffer);
 
+    const normalizedAnalysisVideoPath = path.join(tempDir, `normalized-${safeName}`);
+    const debugMarkedFramePath = path.join(tempDir, 'grounding-marked-debug.jpg');
+    const normalizedMedia = await normalizeAnalysisVideo(tempPath, normalizedAnalysisVideoPath);
+
     const groundingFrames = await extractPlayerGroundingFrames(
-      tempPath,
+      normalizedMedia.normalizedAnalysisVideoPath,
       params.metadata.playerSelection,
-      params.metadata.clip.durationMs
+      params.metadata.clip.durationMs,
+      debugMarkedFramePath
     );
     logPlayerGroundingExtraction(params.metadata.playerSelection, groundingFrames);
+
+    if (groundingFrames.debugMarkedFramePath) {
+      console.log('[GeminiGrounding] Debug marked frame saved', {
+        path: groundingFrames.debugMarkedFramePath,
+      });
+    }
 
     if (params.metadata.playerTracking) {
       console.log('[Analysis] User-confirmed tracking data', {
@@ -477,13 +532,13 @@ export async function analyseVideoWithGemini(params: {
 
     const analysisStarted = Date.now();
 
-    let modelName = await resolveAnalysisModel(ai, failedModels);
+    let modelName = await resolveLegacyAnalysisModel(ai, failedModels);
     logGeminiModel(modelName, GEMINI_FILES_UPLOAD_ENDPOINT);
 
     const uploadedFile = await ai.files
       .upload({
-        file: tempPath,
-        config: { mimeType: params.mimeType, displayName: safeName },
+        file: normalizedMedia.normalizedAnalysisVideoPath,
+        config: { mimeType: params.mimeType, displayName: `normalized-${safeName}` },
       })
       .catch((error: unknown) =>
         logAndRethrowGeminiError(error, modelName, GEMINI_FILES_UPLOAD_ENDPOINT)
@@ -510,9 +565,12 @@ export async function analyseVideoWithGemini(params: {
       bytes: params.videoBuffer.length,
       localDetectedMimeType: params.mimeType,
       uploadedFileMimeType: uploadedFile.mimeType,
+      normalizedVideoPath: normalizedMedia.normalizedAnalysisVideoPath,
+      normalizedWidth: normalizedMedia.outputWidth,
+      normalizedHeight: normalizedMedia.outputHeight,
       contentOrder: groundingFrames.success
-        ? ['clean-frame', 'marked-frame', 'full-video', 'coaching-prompt']
-        : ['full-video', 'coaching-prompt'],
+        ? ['reference-crops', 'clean-frame', 'marked-frame', 'normalized-video', 'coaching-prompt']
+        : ['normalized-video', 'coaching-prompt'],
     });
 
     logGeminiModel(modelName, GEMINI_FILES_GET_ENDPOINT);
@@ -524,31 +582,57 @@ export async function analyseVideoWithGemini(params: {
     });
 
     let lastError: unknown;
+    let narrativeRetryUsed = false;
 
     while (failedModels.length < MAX_MODEL_ATTEMPTS) {
-      modelName = await resolveAnalysisModel(ai, failedModels);
+      modelName = await resolveLegacyAnalysisModel(ai, failedModels);
 
       try {
-        const text = await runAnalysisWithModel(
-          ai,
-          modelName,
-          readyFile,
-          params.metadata,
-          groundingFrames
-        );
-
-        console.log('[Gemini] Response received', {
-          model: modelName,
-          endpoint: GEMINI_GENERATE_ENDPOINT,
-          chars: text.length,
-          fullAnalysisDurationMs: Date.now() - analysisStarted,
-        });
-
-        return parseGeminiJson(text, {
-          mode: params.metadata.mode === 'COACH_ME' ? 'COACH_ME' : params.metadata.mode,
+        const parseOptions = {
+          mode: params.metadata.mode === 'COACH_ME' ? 'COACH_ME' as const : params.metadata.mode,
           playerTracking: params.metadata.playerTracking,
           playerSelection: params.metadata.playerSelection,
-        });
+        };
+
+        const requestAnalysis = async (extraInstruction: string): Promise<string> =>
+          runAnalysisWithModel(
+            ai,
+            modelName,
+            readyFile,
+            params.metadata,
+            groundingFrames,
+            extraInstruction
+          );
+
+        let text = await requestAnalysis('');
+        try {
+          return parseGeminiJson(text, parseOptions);
+        } catch (parseError) {
+          if (
+            isServerAnalysisError(parseError) &&
+            parseError.code === 'NARRATIVE_TIMELINE_MISMATCH' &&
+            !narrativeRetryUsed
+          ) {
+            narrativeRetryUsed = true;
+            console.warn('[NarrativeConsistency] Retrying Gemini once after timeline mismatch');
+            text = await requestAnalysis(NARRATIVE_RETRY_SUFFIX);
+            try {
+              return parseGeminiJson(text, parseOptions);
+            } catch (retryParseError) {
+              if (
+                isServerAnalysisError(retryParseError) &&
+                retryParseError.code === 'NARRATIVE_TIMELINE_MISMATCH'
+              ) {
+                console.warn(
+                  '[NarrativeConsistency] Retry still contradicted timeline — returning uncertain response'
+                );
+                return uncertainAnalysisResponse();
+              }
+              throw retryParseError;
+            }
+          }
+          throw parseError;
+        }
       } catch (error) {
         lastError = error;
 

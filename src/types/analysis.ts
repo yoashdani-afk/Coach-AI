@@ -51,7 +51,7 @@ export interface PlayerIdentityProfile {
   identityConfidence: IdentityConfidenceLevel;
 }
 
-export type TrackingState = 'CONFIRMED' | 'PROBABLE' | 'LOST';
+export type TrackingState = 'CONFIRMED' | 'PROBABLE' | 'SEARCHING' | 'LOST';
 
 /** Normalised bounding box in source video space (0–1). Origin top-left. */
 export interface TrackingBoundingBox {
@@ -61,11 +61,25 @@ export interface TrackingBoundingBox {
   height: number;
 }
 
+export type CoordinateSource = 'detection' | 'prediction' | 'interpolated';
+
+/** Authoritative selected-player sample — preview and analysis share this timeline. */
+export interface SelectedPlayerTrackSample {
+  timestampMs: number;
+  trackId: string | null;
+  normalizedBox: TrackingBoundingBox;
+  identityState: TrackingState;
+  identityConfidence: number;
+  coordinateSource: CoordinateSource;
+}
+
 export interface TrackingKeyframe {
   timestampMs: number;
   state: TrackingState;
   confidence: number;
   box: TrackingBoundingBox;
+  trackId?: string;
+  coordinateSource?: CoordinateSource;
 }
 
 export interface TrackingCorrection {
@@ -88,6 +102,80 @@ export interface PlayerTrackingData {
   /** When set, tracking preview stops updating after this timestamp. */
   skipTrackingAfterMs?: number;
   identityConfidence?: IdentityConfidenceLevel;
+  sourceWidth?: number;
+  sourceHeight?: number;
+  fps?: number;
+  selectedTrackId?: string | null;
+  reliable?: boolean;
+  coverageRatio?: number;
+  confirmedCoverageRatio?: number;
+  failureMessage?: string;
+  rebuildFromMs?: number;
+}
+
+export type TrackingConfirmationAction =
+  | 'confirm'
+  | 'reject'
+  | 'continue_auto'
+  | 'skip_reference'
+  | 'cancel';
+
+export interface TrackingConfirmationResponse {
+  action: TrackingConfirmationAction;
+  confirmed?: boolean;
+  normalizedX?: number;
+  normalizedY?: number;
+}
+
+export interface TrackingIdentityConfirmation {
+  kind: 'second_reference' | 'occluded';
+  checkpointId: string;
+  jobId: string;
+  timestampMs?: number;
+  box?: TrackingBoundingBox;
+  qualityScore?: number;
+  anchorTimestampMs?: number;
+}
+
+export type TrackingBuildStage =
+  | 'checking_server'
+  | 'uploading'
+  | 'upload_complete'
+  | 'job_accepted'
+  | 'decoding_frames'
+  | 'detecting_players'
+  | 'building_tracks'
+  | 'matching_references'
+  | 'verifying_identity'
+  | 'complete'
+  | 'failed';
+
+export interface TrackingBuildProgress {
+  stage: TrackingBuildStage;
+  message: string;
+  /** 0–1 only when derived from real byte or frame counts. Null = indeterminate. */
+  progressRatio: number | null;
+  uploadBytesSent?: number;
+  uploadBytesTotal?: number | null;
+  framesDone?: number;
+  framesTotal?: number;
+  jobId?: string | null;
+}
+
+export interface TrackingBuildDebugState {
+  apiUrl: string;
+  fileUri: string;
+  fileName: string | null;
+  mimeType: string;
+  fileSizeBytes: number | null;
+  uploadBytesSent: number;
+  uploadBytesTotal: number | null;
+  elapsedMs: number;
+  httpStatus: number | null;
+  jobId: string | null;
+  lastBackendResponse: string | null;
+  currentStage: TrackingBuildStage;
+  errorMessage: string | null;
 }
 
 /** Payload for the future real-AI pipeline — kept separate from report generators. */

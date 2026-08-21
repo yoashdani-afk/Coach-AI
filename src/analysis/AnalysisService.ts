@@ -6,21 +6,31 @@ import { isAnalysisApiConfigured } from '@/lib/analysisConfig';
 import {
   classifyAnalysisError,
   formatFallbackReason,
-  GeminiAnalysisError,
   isPlayerGroundingFailure,
   type AnalysisFailureCategory,
 } from '@/lib/analysisErrors';
-import { getAnalysisApiUrlMode, logAnalysisApiTarget } from '@/lib/analysisConfig';
+import { logAnalysisApiTarget } from '@/lib/analysisConfig';
 import type { CoachingReport, ReportAnalysisSource } from '@/types/analysis';
+import { isInsufficientEvidenceResponse } from '@/analysis/models/AnalysisResponse';
 
 export type AnalysisSource = ReportAnalysisSource;
 
-export interface AnalysisResult {
+export interface AnalysisSuccessResult {
+  outcome: 'report';
   report: CoachingReport;
   source: AnalysisSource;
   /** Set when source is demo — explains why Gemini was not used. */
   fallbackReason?: string;
 }
+
+export interface AnalysisInsufficientEvidenceResult {
+  outcome: 'insufficient_evidence';
+  message: string;
+  requestId?: string;
+  source: 'gemini';
+}
+
+export type AnalysisRunResult = AnalysisSuccessResult | AnalysisInsufficientEvidenceResult;
 
 function tagDemoReport(
   report: CoachingReport,
@@ -42,12 +52,13 @@ function tagDemoReport(
  */
 export async function runAnalysis(
   request: AnalysisRequestPayload
-): Promise<AnalysisResult> {
+): Promise<AnalysisRunResult> {
   if (!isAnalysisApiConfigured) {
     const category: AnalysisFailureCategory = 'API URL not configured';
     console.log('[Analysis] Provider: Demo');
     console.log('[Analysis] Reason for fallback:', category);
     return {
+      outcome: 'report',
       report: tagDemoReport(DemoProvider.analyse(request), category),
       source: 'demo',
       fallbackReason: category,
@@ -61,7 +72,21 @@ export async function runAnalysis(
     const response = await GeminiProvider.analyse(request);
     console.log('[Analysis] Video uploaded successfully');
     console.log('[Analysis] Gemini response received');
+
+    if (isInsufficientEvidenceResponse(response)) {
+      console.log('[Analysis] Server returned insufficient_evidence — no report or scores', {
+        requestId: response.requestId,
+      });
+      return {
+        outcome: 'insufficient_evidence',
+        message: response.message,
+        requestId: response.requestId,
+        source: 'gemini',
+      };
+    }
+
     return {
+      outcome: 'report',
       report: mapResponseToReport(request, response),
       source: 'gemini',
     };
@@ -73,28 +98,15 @@ export async function runAnalysis(
     const category = classifyAnalysisError(error);
     const detail = error instanceof Error ? error.message : String(error);
 
-    if (
-      __DEV__ &&
-      (category === 'server unreachable' || category === 'invalid Gemini response')
-    ) {
-      console.error('[Analysis] Gemini failed in development — not falling back to demo', {
-        detail,
-        category,
-        mode: getAnalysisApiUrlMode(),
-      });
-      throw error instanceof GeminiAnalysisError
-        ? error
-        : new GeminiAnalysisError(category, detail);
-    }
-
     console.log('[Analysis] Provider: Demo');
     console.log('[Analysis] Reason for fallback:', formatFallbackReason(category, detail));
 
     if (__DEV__) {
-      console.warn('[Analysis] Gemini failed in development:', detail);
+      console.warn('[Analysis] Gemini failed — using demo feedback:', detail);
     }
 
     return {
+      outcome: 'report',
       report: tagDemoReport(DemoProvider.analyse(request), category, detail),
       source: 'demo',
       fallbackReason: formatFallbackReason(category, detail),

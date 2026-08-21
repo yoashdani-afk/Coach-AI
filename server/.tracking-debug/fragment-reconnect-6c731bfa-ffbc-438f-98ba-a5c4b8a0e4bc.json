@@ -1,0 +1,53 @@
+{
+  "originalTrackCoverageRatio": 0.4343156026712744,
+  "mergedTrackIds": [
+    "track-10"
+  ],
+  "mergedCoverageRatio": 0.4343156026712744,
+  "confirmedDurationMs": 4428.571428571428,
+  "lostDurationMs": 5768.095238095239,
+  "remainingLostIntervals": [
+    {
+      "startMs": 6857,
+      "endMs": 10196.666666666668
+    }
+  ],
+  "candidateEvaluations": [
+    {
+      "anchorTrackId": "track-10",
+      "candidateTrackId": "track-15",
+      "direction": "forward",
+      "anchorEndMs": 6000,
+      "candidateStartMs": 3143,
+      "temporalGapMs": 2857,
+      "appearanceSimilarity": 0.23165955863832552,
+      "kitColorSimilarity": 0,
+      "spatialDistance": 0.4072621890515488,
+      "predictedPosition": {
+        "x": 0.7961430081398615,
+        "y": 0.6647385834675013
+      },
+      "candidateStartPosition": {
+        "x": 0.4695156216621399,
+        "y": 0.9080018997192383
+      },
+      "scaleRatio": 1.0025308941828968,
+      "motionConsistency": 0.3580547570078455,
+      "accepted": false,
+      "rejectionReasons": [
+        "aggregated_similarity_low (0.081 < 0.48)",
+        "kit_similarity_low (0.000 < 0.52)",
+        "appearance_similarity_low (0.232 < 0.4)"
+      ]
+    }
+  ],
+  "rankedCandidates": [
+    {
+      "rank": 1,
+      "candidateTrackId": "track-15",
+      "direction": "forward",
+      "aggregatedScore": 0.08108084552341392,
+      "accepted": false
+    }
+  ]
+}

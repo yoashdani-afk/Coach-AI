@@ -5,6 +5,7 @@ import type { PlayerProfile } from '@/types/profile';
 import { FREE_TIER_ANALYSES_PER_MONTH } from '@/lib/constants';
 import { isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
 import { useAnalysisCreditsStore } from '@/stores/analysisCreditsStore';
+import { migrateStoredProfile } from '@/lib/profileUtils';
 
 interface ProfileState {
   hasSeenOnboarding: boolean;
@@ -105,6 +106,14 @@ export const useProfileStore = create<ProfileState>()(
         profile: state.profile,
       }),
       onRehydrateStorage: () => (state) => {
+        if (state?.profile) {
+          const migrated = migrateStoredProfile(state.profile);
+          if (migrated) {
+            state.setProfile(migrated);
+          } else {
+            state.clearProfile();
+          }
+        }
         state?.setHasHydrated(true);
       },
     }
@@ -115,4 +124,8 @@ export { getRemainingAnalyses, canStartAnalysis, remainingAnalysesLabel, isDevUn
 
 export function hasCompleteProfile(profile: PlayerProfile | null): boolean {
   return profile?.isComplete === true;
+}
+
+export function profileNeedsCompletion(profile: PlayerProfile | null): boolean {
+  return profile != null && profile.isComplete !== true;
 }

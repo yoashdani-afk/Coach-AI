@@ -20,6 +20,10 @@ export default function Index() {
     return <Redirect href="/(tabs)" />;
   }
 
+  if (profile && hasSeenOnboarding) {
+    return <Redirect href="/(onboarding)/setup?edit=1" />;
+  }
+
   if (!hasSeenOnboarding) {
     return <Redirect href="/(onboarding)/welcome" />;
   }

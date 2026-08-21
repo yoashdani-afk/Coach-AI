@@ -11,15 +11,27 @@ import { formatDuration, formatFileSize } from '@/lib/format';
 import { useUploadStore } from '@/stores/uploadStore';
 import type { AnalysisMode } from '@/types/analysis';
 
+const IDENTIFY_ROUTE = '/(upload)/identify';
+
 export default function ModeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const clip = useUploadStore((s) => s.clip);
   const setAnalysisMode = useUploadStore((s) => s.setAnalysisMode);
   const setPlayerSelection = useUploadStore((s) => s.setPlayerSelection);
+  const setPlayerTracking = useUploadStore((s) => s.setPlayerTracking);
+
+  useEffect(() => {
+    console.log('[AnalysisModeScreen] MOUNT');
+    setPlayerTracking(null);
+    return () => {
+      console.log('[AnalysisModeScreen] UNMOUNT');
+    };
+  }, [setPlayerTracking]);
 
   useEffect(() => {
     if (!clip) {
+      console.log('[Navigation] destination', '/(upload)');
       router.replace('/(upload)');
     }
   }, [clip, router]);
@@ -29,9 +41,12 @@ export default function ModeScreen() {
   }
 
   const handleSelectMode = (mode: AnalysisMode) => {
+    console.log('[AnalysisModeScreen] SELECT', { mode });
+    console.log('[Navigation] destination', IDENTIFY_ROUTE);
     setAnalysisMode(mode);
     setPlayerSelection(null);
-    router.push('/(upload)/identify');
+    setPlayerTracking(null);
+    router.push(IDENTIFY_ROUTE);
   };
 
   return (

@@ -2,6 +2,8 @@ import type { AnalysisRequestPayload } from '@/analysis/models/AnalysisRequest';
 import { toRequestMetadata } from '@/analysis/models/AnalysisRequest';
 import {
   isAnalysisResponse,
+  isInsufficientEvidenceResponse,
+  type AnalyseVideoApiResponse,
   type AnalysisResponse,
 } from '@/analysis/models/AnalysisResponse';
 import { analysisEndpoint, logAnalysisApiTarget } from '@/lib/analysisConfig';
@@ -27,7 +29,7 @@ function inferMimeType(fileName: string | null): string {
  */
 export async function analyseWithGemini(
   request: AnalysisRequestPayload
-): Promise<AnalysisResponse> {
+): Promise<AnalyseVideoApiResponse> {
   const metadata = toRequestMetadata(request);
   const formData = new FormData();
 
@@ -86,6 +88,14 @@ export async function analyseWithGemini(
         'invalid Gemini response',
         'Analysis API returned non-JSON response'
       );
+    }
+
+    if (isInsufficientEvidenceResponse(parsed)) {
+      console.log('[Analysis] Insufficient evidence from server', {
+        requestId: parsed.requestId,
+        message: parsed.message,
+      });
+      return parsed;
     }
 
     if (!isAnalysisResponse(parsed)) {

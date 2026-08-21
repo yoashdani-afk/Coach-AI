@@ -12,13 +12,23 @@ export type Position =
 export type PreferredFoot = 'LEFT' | 'RIGHT' | 'BOTH';
 
 export type PlayingLevel =
+  | 'GRASSROOTS_SCHOOL'
+  | 'ACADEMY'
+  | 'SEMI_PRO'
+  | 'PROFESSIONAL'
+  | 'VETERAN_SUNDAY';
+
+/** Pre-expansion levels — only used during AsyncStorage migration. */
+export type LegacyPlayingLevel =
   | 'BEGINNER'
   | 'GRASSROOTS'
   | 'SCHOOL'
-  | 'ACADEMY'
   | 'AMATEUR'
   | 'SEMI_PROFESSIONAL'
   | 'PROFESSIONAL';
+
+export type HeightDisplayUnit = 'cm' | 'ft_in';
+export type WeightDisplayUnit = 'kg' | 'lb';
 
 export type ImprovementGoal =
   | 'FIRST_TOUCH'
@@ -47,13 +57,25 @@ export type FeedbackArea =
 
 export interface PlayerProfile {
   firstName: string;
+  /** ISO date YYYY-MM-DD */
+  dateOfBirth: string;
+  /** Derived from dateOfBirth on save — kept for analysis metadata compatibility. */
   age: number;
-  country: string;
+  nationality: string;
+  countryPlayingIn: string;
+  yearsPlayingFootball: number;
+  yearsInPrimaryPosition: number;
+  isGoalkeeper: boolean;
   mainPosition: Position;
   secondaryPosition: Position | null;
   preferredFoot: PreferredFoot;
   playingLevel: PlayingLevel;
   club: string | null;
+  clubLevel: string | null;
+  heightCm: number | null;
+  weightKg: number | null;
+  heightDisplayUnit: HeightDisplayUnit;
+  weightDisplayUnit: WeightDisplayUnit;
   playingStyle: string[];
   improvementGoals: ImprovementGoal[];
   feedbackAreas: FeedbackArea[];

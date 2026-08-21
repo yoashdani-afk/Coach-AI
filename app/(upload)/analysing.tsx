@@ -15,8 +15,8 @@ import { useAnalysisStore } from '@/stores/analysisStore';
 import { useProfileStore } from '@/stores/profileStore';
 import { useUploadStore } from '@/stores/uploadStore';
 
-const MIN_DISPLAY_MS = 3_000;
-const PROGRESS_TICK_MS = 200;
+const MIN_DISPLAY_MS = 2_000;
+const PROGRESS_TICK_MS = 500;
 
 function resolveQuestionLabel(
   questionType: NonNullable<ReturnType<typeof useUploadStore.getState>['questionType']>,
@@ -34,7 +34,6 @@ export default function AnalysingScreen() {
   const clip = useUploadStore((s) => s.clip);
   const analysisMode = useUploadStore((s) => s.analysisMode);
   const playerSelection = useUploadStore((s) => s.playerSelection);
-  const playerTracking = useUploadStore((s) => s.playerTracking);
   const questionType = useUploadStore((s) => s.questionType);
   const customQuestion = useUploadStore((s) => s.customQuestion);
   const context = useUploadStore((s) => s.context);
@@ -45,7 +44,6 @@ export default function AnalysingScreen() {
   const clearDraft = useUploadStore((s) => s.clearDraft);
   const addReport = useAnalysisStore((s) => s.addReport);
 
-  const [progress, setProgress] = useState(0);
   const [messageIndex, setMessageIndex] = useState(0);
   const [statusNote, setStatusNote] = useState<string | null>(null);
   const hasStarted = useRef(false);
@@ -71,6 +69,11 @@ export default function AnalysingScreen() {
     hasStarted.current = true;
     setIsAnalysing(true);
 
+    console.log('[Analysis] START WITHOUT TRACKING', {
+      mode: analysisMode,
+      hasPlayerSelection: Boolean(playerSelection),
+    });
+
     const attemptId = createAnalysisAttemptId();
     setAnalysisAttemptId(attemptId);
 
@@ -79,7 +82,7 @@ export default function AnalysingScreen() {
       mode: analysisMode,
       profile,
       playerSelection,
-      playerTracking: playerTracking ?? undefined,
+      playerTracking: undefined,
       questionType: analysisMode === 'COACH_ME' ? questionType! : undefined,
       question:
         analysisMode === 'COACH_ME'
@@ -91,17 +94,9 @@ export default function AnalysingScreen() {
     const startTime = Date.now();
     let cancelled = false;
 
-    const progressInterval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const pct = Math.min(95, Math.round((elapsed / 45_000) * 100));
-      setProgress(pct);
-      setMessageIndex(
-        Math.min(
-          ANALYSIS_STATUS_MESSAGES.length - 1,
-          Math.floor((elapsed / 45_000) * ANALYSIS_STATUS_MESSAGES.length)
-        )
-      );
-    }, PROGRESS_TICK_MS);
+    const messageTimer = setInterval(() => {
+      setMessageIndex((i) => Math.min(ANALYSIS_STATUS_MESSAGES.length - 1, i + 1));
+    }, PROGRESS_TICK_MS * 8);
 
     void (async () => {
       try {
@@ -114,8 +109,19 @@ export default function AnalysingScreen() {
         }
         if (cancelled) return;
 
-        clearInterval(progressInterval);
-        setProgress(100);
+        clearInterval(messageTimer);
+
+        if (result.outcome === 'insufficient_evidence') {
+          setIsAnalysing(false);
+          router.replace({
+            pathname: '/(upload)/analysis-failed',
+            params: {
+              message: result.message,
+              requestId: result.requestId ?? '',
+            },
+          });
+          return;
+        }
 
         if (__DEV__ && result.source === 'demo' && result.fallbackReason) {
           Alert.alert(
@@ -127,7 +133,7 @@ export default function AnalysingScreen() {
 
         setStatusNote(
           result.source === 'gemini'
-            ? 'AI analysis complete.'
+            ? 'Analysis complete.'
             : result.fallbackReason ?? 'Using demo feedback.'
         );
 
@@ -158,18 +164,15 @@ export default function AnalysingScreen() {
       } catch (error) {
         if (cancelled) return;
         console.error('[analysing] Failed to generate report:', error);
-        clearInterval(progressInterval);
+        clearInterval(messageTimer);
         setIsAnalysing(false);
         hasStarted.current = false;
 
-        const groundingMessage = isPlayerGroundingFailure(error)
-          ? error.message
-          : null;
+        const groundingMessage = isPlayerGroundingFailure(error) ? error.message : null;
 
         Alert.alert(
           groundingMessage ? 'Player not identified' : 'Something went wrong',
-          groundingMessage ??
-            'We could not build your report. Please try again.',
+          groundingMessage ?? 'We could not build your report. Please try again.',
           [
             {
               text: 'OK',
@@ -189,7 +192,7 @@ export default function AnalysingScreen() {
 
     return () => {
       cancelled = true;
-      clearInterval(progressInterval);
+      clearInterval(messageTimer);
     };
   }, [
     clip,
@@ -211,10 +214,6 @@ export default function AnalysingScreen() {
 
   const modeLabel = analysisMode ? labelForAnalysisMode(analysisMode) : 'Your clip';
 
-  const infoText = isAnalysisApiConfigured
-    ? 'Uploading your clip to the analysis server. The video is reviewed by Gemini — your API key stays on the server.'
-    : 'Demo mode — reports are generated locally. Add EXPO_PUBLIC_ANALYSIS_API_URL to connect real AI analysis.';
-
   return (
     <View
       className="flex-1 bg-background px-4"
@@ -230,21 +229,17 @@ export default function AnalysingScreen() {
           <Text className="text-text-primary text-xl font-bold text-center">
             {ANALYSIS_STATUS_MESSAGES[messageIndex]}
           </Text>
-
-          <View className="w-full h-2 bg-surface-elevated rounded-full overflow-hidden">
-            <View className="h-full bg-primary rounded-full" style={{ width: `${progress}%` }} />
-          </View>
-
-          <Text className="text-text-muted text-sm text-center">
-            {isAnalysisApiConfigured ? 'This may take up to a minute' : 'Generating locally'}
-          </Text>
           {statusNote ? (
             <Text className="text-text-secondary text-xs text-center">{statusNote}</Text>
           ) : null}
         </View>
 
         <Card variant="outlined" className="w-full">
-          <Text className="text-text-secondary text-sm text-center leading-5">{infoText}</Text>
+          <Text className="text-text-secondary text-sm text-center leading-5">
+            {isAnalysisApiConfigured
+              ? 'Building your personalised football analysis.'
+              : 'Demo mode — generating feedback locally.'}
+          </Text>
         </Card>
       </View>
     </View>

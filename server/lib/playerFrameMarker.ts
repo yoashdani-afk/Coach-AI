@@ -1,13 +1,13 @@
 import { spawn } from 'node:child_process';
+import { writeFile } from 'node:fs/promises';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import sharp from 'sharp';
 import {
-  frameMatchesDisplayGeometry,
-  mapTapToFramePixels,
-} from './markerCoordinates.js';
+  mapNormalizedTapToPixels,
+  orientationFromSize,
+} from './videoOrientation.js';
 import type { PlayerSelection } from './types.js';
 import { getFocusTimestampSec } from './videoWindow.js';
-import { probeVideoGeometry, type VideoGeometry } from './videoProbe.js';
 
 const FFMPEG_PATH = ffmpegInstaller.path;
 
@@ -15,11 +15,8 @@ export interface PlayerGroundingFramesResult {
   success: boolean;
   cleanFrameBase64?: string;
   markedFrameBase64?: string;
-  /** Zoomed crop around the player — no marker. */
   cleanCropBase64?: string;
-  /** Optional nearby-time crops for re-identification. */
   nearbyCropBase64?: string[];
-  /** Crops from each user identity reference (primary/secondary/tertiary). */
   identityReferenceCropsBase64?: string[];
   mimeType: 'image/jpeg';
   frameWidth?: number;
@@ -31,8 +28,7 @@ export interface PlayerGroundingFramesResult {
   timestampMs: number;
   tapNormalizedX: number;
   tapNormalizedY: number;
-  geometry?: VideoGeometry;
-  frameIsDisplayOriented?: boolean;
+  debugMarkedFramePath?: string;
   error?: string;
 }
 
@@ -42,6 +38,7 @@ function runFfmpegExtractFrame(videoPath: string, timestampSec: number): Promise
       '-hide_banner',
       '-loglevel',
       'error',
+      '-noautorotate',
       '-ss',
       timestampSec.toFixed(3),
       '-i',
@@ -77,7 +74,6 @@ function runFfmpegExtractFrame(videoPath: string, timestampSec: number): Promise
   });
 }
 
-/** Corner bracket + arrow pointing at player — marker offset so kit/body stays visible. */
 function buildCornerMarkerSvg(
   width: number,
   height: number,
@@ -130,56 +126,34 @@ async function extractCropAroundPlayer(
     .toBuffer();
 }
 
-async function extractReferenceCropAt(
-  videoPath: string,
-  playerSelection: PlayerSelection,
-  referenceTimestampMs: number,
+async function extractFrameCropAt(
+  normalizedAnalysisVideoPath: string,
   normalizedX: number,
   normalizedY: number,
-  geometry: VideoGeometry
-): Promise<string | null> {
-  const timestampSec = Math.max(0, referenceTimestampMs / 1000);
+  timestampMs: number
+): Promise<Buffer | null> {
+  const timestampSec = Math.max(0, timestampMs / 1000);
   try {
-    const rawFrame = await runFfmpegExtractFrame(videoPath, timestampSec);
+    const rawFrame = await runFfmpegExtractFrame(normalizedAnalysisVideoPath, timestampSec);
     const meta = await sharp(rawFrame).metadata();
     if (!meta.width || !meta.height) return null;
 
-    const frameIsDisplayOriented = frameMatchesDisplayGeometry(
-      meta.width,
-      meta.height,
-      geometry
-    );
-
-    const marker = mapTapToFramePixels({
-      playerSelection: {
-        ...playerSelection,
-        normalizedX,
-        normalizedY,
-        timestampMs: referenceTimestampMs,
-      },
-      frameWidth: meta.width,
-      frameHeight: meta.height,
-      geometry,
-      frameIsDisplayOriented,
-    });
-
-    const crop = await extractCropAroundPlayer(
-      rawFrame,
-      meta.width,
-      meta.height,
-      marker.x,
-      marker.y
-    );
-    return crop.toString('base64');
+    const marker = mapNormalizedTapToPixels(normalizedX, normalizedY, meta.width, meta.height);
+    return extractCropAroundPlayer(rawFrame, meta.width, meta.height, marker.x, marker.y);
   } catch {
     return null;
   }
 }
 
+/**
+ * Extract grounding frames from the display-oriented normalized analysis video.
+ * Tap coordinates map directly — no additional rotation or geometry transforms.
+ */
 export async function extractPlayerGroundingFrames(
-  videoPath: string,
+  normalizedAnalysisVideoPath: string,
   playerSelection: PlayerSelection,
-  clipDurationMs: number
+  clipDurationMs: number,
+  debugMarkedFramePath?: string
 ): Promise<PlayerGroundingFramesResult> {
   const timestampSec = getFocusTimestampSec(playerSelection, clipDurationMs);
   const clipDurationSec = Math.max(0.1, clipDurationMs / 1000);
@@ -192,28 +166,30 @@ export async function extractPlayerGroundingFrames(
   };
 
   try {
-    const geometry = await probeVideoGeometry(videoPath);
-    const rawFrame = await runFfmpegExtractFrame(videoPath, timestampSec);
+    const rawFrame = await runFfmpegExtractFrame(normalizedAnalysisVideoPath, timestampSec);
     const meta = await sharp(rawFrame).metadata();
     const frameWidth = meta.width;
     const frameHeight = meta.height;
 
     if (!frameWidth || !frameHeight) {
-      return { ...base, geometry, error: 'Could not read extracted frame dimensions' };
+      return { ...base, error: 'Could not read extracted frame dimensions' };
     }
 
-    const frameIsDisplayOriented = frameMatchesDisplayGeometry(
+    const marker = mapNormalizedTapToPixels(
+      playerSelection.normalizedX,
+      playerSelection.normalizedY,
       frameWidth,
-      frameHeight,
-      geometry
+      frameHeight
     );
 
-    const marker = mapTapToFramePixels({
-      playerSelection,
-      frameWidth,
-      frameHeight,
-      geometry,
-      frameIsDisplayOriented,
+    console.log('[GeminiGrounding] FRAME', {
+      width: frameWidth,
+      height: frameHeight,
+      normalizedX: playerSelection.normalizedX,
+      normalizedY: playerSelection.normalizedY,
+      pixelX: marker.x,
+      pixelY: marker.y,
+      orientation: orientationFromSize(frameWidth, frameHeight),
     });
 
     const cleanJpeg = await encodeJpeg(rawFrame);
@@ -234,35 +210,28 @@ export async function extractPlayerGroundingFrames(
       .jpeg({ quality: 90 })
       .toBuffer();
 
+    if (debugMarkedFramePath) {
+      await writeFile(debugMarkedFramePath, markedJpeg);
+    }
+
     const nearbyOffsets = [-0.5, 0.5];
     const nearbyCropBase64: string[] = [];
 
     for (const offsetSec of nearbyOffsets) {
-      const nearbySec = Math.min(
-        clipDurationSec,
-        Math.max(0, timestampSec + offsetSec)
-      );
+      const nearbySec = Math.min(clipDurationSec, Math.max(0, timestampSec + offsetSec));
       if (Math.abs(nearbySec - timestampSec) < 0.05) continue;
 
       try {
-        const nearbyFrame = await runFfmpegExtractFrame(videoPath, nearbySec);
+        const nearbyFrame = await runFfmpegExtractFrame(normalizedAnalysisVideoPath, nearbySec);
         const nearbyMeta = await sharp(nearbyFrame).metadata();
         if (!nearbyMeta.width || !nearbyMeta.height) continue;
 
-        const nearbyMarker = mapTapToFramePixels({
-          playerSelection: {
-            ...playerSelection,
-            timestampMs: Math.round(nearbySec * 1000),
-          },
-          frameWidth: nearbyMeta.width,
-          frameHeight: nearbyMeta.height,
-          geometry,
-          frameIsDisplayOriented: frameMatchesDisplayGeometry(
-            nearbyMeta.width,
-            nearbyMeta.height,
-            geometry
-          ),
-        });
+        const nearbyMarker = mapNormalizedTapToPixels(
+          playerSelection.normalizedX,
+          playerSelection.normalizedY,
+          nearbyMeta.width,
+          nearbyMeta.height
+        );
 
         const nearbyCrop = await extractCropAroundPlayer(
           nearbyFrame,
@@ -290,15 +259,13 @@ export async function extractPlayerGroundingFrames(
       ];
 
     for (const ref of references) {
-      const crop = await extractReferenceCropAt(
-        videoPath,
-        playerSelection,
-        ref.timestampMs,
+      const crop = await extractFrameCropAt(
+        normalizedAnalysisVideoPath,
         ref.normalizedX,
         ref.normalizedY,
-        geometry
+        ref.timestampMs
       );
-      if (crop) identityReferenceCropsBase64.push(crop);
+      if (crop) identityReferenceCropsBase64.push(crop.toString('base64'));
     }
 
     return {
@@ -315,8 +282,7 @@ export async function extractPlayerGroundingFrames(
       markerPixelY: marker.y,
       clampedNormalizedX: marker.clampedNormalizedX,
       clampedNormalizedY: marker.clampedNormalizedY,
-      geometry,
-      frameIsDisplayOriented,
+      debugMarkedFramePath,
     };
   } catch (error) {
     return {
@@ -341,6 +307,7 @@ export function logPlayerGroundingExtraction(
     extractedFrameHeight: result.frameHeight,
     markerPixelX: result.markerPixelX,
     markerPixelY: result.markerPixelY,
+    debugMarkedFramePath: result.debugMarkedFramePath,
     hasCleanCrop: Boolean(result.cleanCropBase64),
     nearbyCropCount: result.nearbyCropBase64?.length ?? 0,
     identityReferenceCropCount: result.identityReferenceCropsBase64?.length ?? 0,

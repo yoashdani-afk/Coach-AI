@@ -161,15 +161,20 @@ export function buildScoresFromGeminiResponse(
 
   const categories = expected.map((label) => {
     const fromGemini = findGeminiScore(response.scores, label);
-    const score =
-      fromGemini ?? deriveScoreFromAnalysis(label, response, `${seed}:${mode}`);
+    if (fromGemini == null) {
+      return {
+        label,
+        key: labelToKey(label),
+        score: 0,
+      };
+    }
 
     return {
       label,
       key: labelToKey(label),
-      score,
+      score: fromGemini,
     };
-  });
+  }).filter((category) => category.score > 0);
 
   const calibrated = applyClientConsistencyCaps(categories, response);
   console.log('[ScoreCalibration] Client category scores', calibrated);

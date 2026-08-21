@@ -1,27 +1,31 @@
-import { View, Text } from 'react-native';
+import { ScrollView, View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
-import { Card } from '@/components/ui';
+import { ImproveCategoryGrid } from '@/components/improve/ImproveCategoryGrid';
+import { getAllImproveCategories } from '@/lib/improveContent';
 
 export default function CoachScreen() {
   const insets = useSafeAreaInsets();
+  const categories = getAllImproveCategories();
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="AI Coach" subtitle="Your personal coach" />
-      <View className="flex-1 px-4" style={{ paddingBottom: insets.bottom + 24 }}>
-        <Card variant="outlined" className="items-center py-12 mt-4 gap-4">
-          <View className="w-16 h-16 rounded-2xl bg-primary-muted items-center justify-center">
-            <Ionicons name="chatbubbles-outline" size={32} color="#00C853" />
+      <ScrollView
+        className="flex-1 px-4"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="gap-3 mt-2">
+          <View>
+            <Text className="text-text-muted text-xs uppercase tracking-wider mb-1">Improve</Text>
+            <Text className="text-text-secondary text-sm leading-5">
+              Build specific skills off the pitch with guided explanations and drills.
+            </Text>
           </View>
-          <Text className="text-text-primary text-lg font-semibold text-center">Ask your coach</Text>
-          <Text className="text-text-secondary text-sm text-center leading-6 px-4">
-            After your first clip analysis, chat with your AI coach about your performance, drills, and
-            how to improve.
-          </Text>
-        </Card>
-      </View>
+          <ImproveCategoryGrid categories={categories} />
+        </View>
+      </ScrollView>
     </View>
   );
 }

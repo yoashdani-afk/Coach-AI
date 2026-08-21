@@ -3,7 +3,8 @@ export type ServerAnalysisErrorCode =
   | 'UPLOAD_FAILED'
   | 'GEMINI_PROCESSING_FAILED'
   | 'INVALID_GEMINI_RESPONSE'
-  | 'PLAYER_GROUNDING_FAILED';
+  | 'PLAYER_GROUNDING_FAILED'
+  | 'NARRATIVE_TIMELINE_MISMATCH';
 
 export class ServerAnalysisError extends Error {
   readonly code: ServerAnalysisErrorCode;

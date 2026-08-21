@@ -6,6 +6,10 @@ import {
 } from './playerGrounding.js';
 import type { AnalysisResponse, AnalysisScore, AnalysisTrackingMetadataLog } from './types.js';
 import { calibrateScores } from './scoreCalibration.js';
+import {
+  buildUncertainAnalysisResponse,
+  validateNarrativeAgainstTimeline,
+} from './narrativeConsistency.js';
 
 const LOG_TRUNCATE_CHARS = 10_000;
 
@@ -556,6 +560,7 @@ export function parseGeminiJson(
     mode?: 'GOAL' | 'PERFORMANCE' | 'COACH_ME';
     playerTracking?: import('./types.js').PlayerTrackingData;
     playerSelection?: import('./types.js').PlayerSelection;
+    validateNarrative?: boolean;
   }
 ): AnalysisResponse {
   console.log('[Gemini] Raw response before parse', {
@@ -620,6 +625,30 @@ export function parseGeminiJson(
   const betterOption = asString(obj.betterOption);
   const professionalInsight = asString(obj.professionalInsight);
 
+  const completePlay = readCompletePlayTimeline(obj);
+  const selectedPlayer = readSelectedPlayerTimeline(obj);
+
+  if (options?.validateNarrative !== false) {
+    const narrativeCheck = validateNarrativeAgainstTimeline({
+      whatHappened,
+      summary,
+      completePlay,
+      selectedPlayer,
+    });
+
+    if (!narrativeCheck.ok) {
+      console.warn('[NarrativeConsistency] Gate fired', {
+        contradictions: narrativeCheck.contradictions,
+      });
+      throw new ServerAnalysisError(
+        `Narrative contradicted observed timeline: ${narrativeCheck.contradictions.join(', ')}`,
+        'NARRATIVE_TIMELINE_MISMATCH'
+      );
+    }
+
+    console.log('[NarrativeConsistency] Gate passed');
+  }
+
   const identityConfidence =
     options?.playerSelection?.identityProfile?.identityConfidence ??
     (options?.playerSelection?.reducedTrackingConfidence ? 'LOW' : 'HIGH');
@@ -682,4 +711,9 @@ export function parseGeminiJson(
   });
 
   return response;
+}
+
+/** Safe fallback when narrative cannot be aligned to the observed timeline after retry. */
+export function uncertainAnalysisResponse(): AnalysisResponse {
+  return buildUncertainAnalysisResponse();
 }

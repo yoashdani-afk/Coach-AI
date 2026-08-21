@@ -1,0 +1,845 @@
+{
+  "originalTrackCoverageRatio": 0.18792413433095528,
+  "mergedTrackIds": [
+    "track-4"
+  ],
+  "mergedCoverageRatio": 0.18792413433095528,
+  "confirmedDurationMs": 5142.857142857143,
+  "lostDurationMs": 22223.809523809527,
+  "remainingLostIntervals": [
+    {
+      "startMs": 8000,
+      "endMs": 27366.666666666668
+    }
+  ],
+  "candidateEvaluations": [
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-1",
+      "direction": "backward",
+      "anchorEndMs": 1857,
+      "candidateStartMs": 3857,
+      "temporalGapMs": 2000,
+      "appearanceSimilarity": 0.8971779015711655,
+      "kitColorSimilarity": 0.8738544051825747,
+      "spatialDistance": 0.3537273360236073,
+      "predictedPosition": {
+        "x": 0.5510324686765671,
+        "y": 0.7343676686286926
+      },
+      "candidateStartPosition": {
+        "x": 0.19763530790805817,
+        "y": 0.7190877795219421
+      },
+      "scaleRatio": 1.0951817335646898,
+      "motionConsistency": 1,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (0.354 > 0.280)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-2",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 0,
+      "temporalGapMs": 7143,
+      "appearanceSimilarity": 0.6677145039877789,
+      "kitColorSimilarity": 0.5775225638374784,
+      "spatialDistance": 3.3215610779116207,
+      "predictedPosition": {
+        "x": 4.102661566965126,
+        "y": 0.4650932075260402
+      },
+      "candidateStartPosition": {
+        "x": 0.7814647555351257,
+        "y": 0.5142839998006821
+      },
+      "scaleRatio": 1.6989278737944737,
+      "motionConsistency": 0.4175384564225421,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (3.322 > 0.580)",
+        "long_gap_requires_strong_dual_match"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-6",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 4857,
+      "temporalGapMs": 2286,
+      "appearanceSimilarity": 0.9078686376553742,
+      "kitColorSimilarity": 0.8975391299957037,
+      "spatialDistance": 1.6669245402305835,
+      "predictedPosition": {
+        "x": 1.8191300740113832,
+        "y": 0.6885237174851078
+      },
+      "candidateStartPosition": {
+        "x": 0.15240469574928284,
+        "y": 0.7142906785011292
+      },
+      "scaleRatio": 1.0200820380527207,
+      "motionConsistency": 0.006106635110183389,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (1.667 > 0.420)",
+        "motion_inconsistent (0.006)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-8",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 5857,
+      "temporalGapMs": 1286,
+      "appearanceSimilarity": 0.8918821104439769,
+      "kitColorSimilarity": 0.8798034990655861,
+      "spatialDistance": 0.8442694574319889,
+      "predictedPosition": {
+        "x": 1.285282603975186,
+        "y": 0.6713725814035723
+      },
+      "candidateStartPosition": {
+        "x": 0.44101691246032715,
+        "y": 0.6688508987426758
+      },
+      "scaleRatio": 1.0601234473824583,
+      "motionConsistency": 0.9829196416833653,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (0.844 > 0.280)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-11",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 8000,
+      "temporalGapMs": 857,
+      "appearanceSimilarity": 0.8332667593434924,
+      "kitColorSimilarity": 0.8153728188496139,
+      "spatialDistance": 1.41082046153743,
+      "predictedPosition": {
+        "x": 1.5813264712205022,
+        "y": 0.6379873940161058
+      },
+      "candidateStartPosition": {
+        "x": 0.17075884342193604,
+        "y": 0.6646958589553833
+      },
+      "scaleRatio": 1.8854794133554382,
+      "motionConsistency": 0.9993232532516494,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (1.411 > 0.280)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-12",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 8143,
+      "temporalGapMs": 1000,
+      "appearanceSimilarity": 0.8975965624733775,
+      "kitColorSimilarity": 0.8821880659122285,
+      "spatialDistance": 1.6004079106579845,
+      "predictedPosition": {
+        "x": 1.6886028016120682,
+        "y": 0.6354051121881792
+      },
+      "candidateStartPosition": {
+        "x": 0.08821872621774673,
+        "y": 0.6266705989837646
+      },
+      "scaleRatio": 1.2595721903267953,
+      "motionConsistency": 0.9716241437379667,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (1.600 > 0.280)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-13",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 8857,
+      "temporalGapMs": 1714,
+      "appearanceSimilarity": 0.4913736857543461,
+      "kitColorSimilarity": 0.4457981720590557,
+      "spatialDistance": 1.4911296688035478,
+      "predictedPosition": {
+        "x": 2.00614345548262,
+        "y": 0.6311277228218692
+      },
+      "candidateStartPosition": {
+        "x": 0.5154273957014084,
+        "y": 0.6662463545799255
+      },
+      "scaleRatio": 2.2935397356716845,
+      "motionConsistency": 0.65,
+      "accepted": false,
+      "rejectionReasons": [
+        "aggregated_similarity_low (0.462 < 0.48)",
+        "kit_similarity_low (0.446 < 0.52)",
+        "spatial_distance_after_pan_comp (1.491 > 0.280)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-14",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 9286,
+      "temporalGapMs": 2143,
+      "appearanceSimilarity": 0.7967167512850728,
+      "kitColorSimilarity": 0.7810699873600966,
+      "spatialDistance": 1.6070753630605719,
+      "predictedPosition": {
+        "x": 2.24719350141992,
+        "y": 0.6199598389488834
+      },
+      "candidateStartPosition": {
+        "x": 0.6402124762535095,
+        "y": 0.6025469899177551
+      },
+      "scaleRatio": 1.235648451889533,
+      "motionConsistency": 0.9988476427238915,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (1.607 > 0.420)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-15",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 9286,
+      "temporalGapMs": 2143,
+      "appearanceSimilarity": 0.7011879501494879,
+      "kitColorSimilarity": 0.6078367878094038,
+      "spatialDistance": 1.3619539097838091,
+      "predictedPosition": {
+        "x": 2.24719350141992,
+        "y": 0.6199598389488834
+      },
+      "candidateStartPosition": {
+        "x": 0.8852530717849731,
+        "y": 0.6260194182395935
+      },
+      "scaleRatio": 1.9396683908163475,
+      "motionConsistency": 0.9998429049419439,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (1.362 > 0.420)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-16",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 10143,
+      "temporalGapMs": 3000,
+      "appearanceSimilarity": 0.870934644408192,
+      "kitColorSimilarity": 0.8499093403851405,
+      "spatialDistance": 2.6941881806340993,
+      "predictedPosition": {
+        "x": 2.7356313454391032,
+        "y": 0.6213505234751668
+      },
+      "candidateStartPosition": {
+        "x": 0.0415432583540678,
+        "y": 0.598127007484436
+      },
+      "scaleRatio": 0.9954947838741514,
+      "motionConsistency": 0.07411230920132345,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (2.694 > 0.420)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-17",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 11286,
+      "temporalGapMs": 4143,
+      "appearanceSimilarity": 0.5093761116771776,
+      "kitColorSimilarity": 0.3520374964843236,
+      "spatialDistance": 2.261870867686482,
+      "predictedPosition": {
+        "x": 3.1828141049709875,
+        "y": 0.6219057296956336
+      },
+      "candidateStartPosition": {
+        "x": 0.9211474061012268,
+        "y": 0.6522959470748901
+      },
+      "scaleRatio": 1.6889003295275657,
+      "motionConsistency": 0.1718600549318876,
+      "accepted": false,
+      "rejectionReasons": [
+        "aggregated_similarity_low (0.407 < 0.48)",
+        "kit_similarity_low (0.352 < 0.52)",
+        "spatial_distance_after_pan_comp (2.262 > 0.420)",
+        "long_gap_requires_strong_dual_match"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-19",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 15000,
+      "temporalGapMs": 7857,
+      "appearanceSimilarity": 0.6606995546088222,
+      "kitColorSimilarity": 0.5455796382847051,
+      "spatialDistance": 4.226178565470951,
+      "predictedPosition": {
+        "x": 4.880964385391168,
+        "y": 0.5750954161573957
+      },
+      "candidateStartPosition": {
+        "x": 0.6613515615463257,
+        "y": 0.810579776763916
+      },
+      "scaleRatio": 1.880541146339605,
+      "motionConsistency": 0.00011928584561815558,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (4.226 > 0.580)",
+        "long_gap_requires_strong_dual_match"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-20",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 15429,
+      "temporalGapMs": 8286,
+      "appearanceSimilarity": 0.769845112496882,
+      "kitColorSimilarity": 0.7071332329746417,
+      "spatialDistance": 4.299298674868012,
+      "predictedPosition": {
+        "x": 5.053818451286248,
+        "y": 0.5733051906515668
+      },
+      "candidateStartPosition": {
+        "x": 0.7587596774101257,
+        "y": 0.7641957998275757
+      },
+      "scaleRatio": 1.2465843808022778,
+      "motionConsistency": 0.65,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (4.299 > 0.580)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-22",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 18714,
+      "temporalGapMs": 11571,
+      "appearanceSimilarity": 0.7052431571097955,
+      "kitColorSimilarity": 0.6387393308441524,
+      "spatialDistance": 5.813053692571313,
+      "predictedPosition": {
+        "x": 6.6898956779143095,
+        "y": 0.5020772383346425
+      },
+      "candidateStartPosition": {
+        "x": 0.8804399371147156,
+        "y": 0.7065698504447937
+      },
+      "scaleRatio": 1.3078601524413476,
+      "motionConsistency": 0.003177585898421764,
+      "accepted": false,
+      "rejectionReasons": [
+        "spatial_distance_after_pan_comp (5.813 > 0.580)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-23",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 19286,
+      "temporalGapMs": 12143,
+      "appearanceSimilarity": 0.7678686153273477,
+      "kitColorSimilarity": 0.6927326019991448,
+      "spatialDistance": 6.936894777323053,
+      "predictedPosition": {
+        "x": 7.006365178376524,
+        "y": 0.48454226709745984
+      },
+      "candidateStartPosition": {
+        "x": 0.07252690941095352,
+        "y": 0.6904451847076416
+      },
+      "scaleRatio": 1.336790925632338,
+      "motionConsistency": 0.9999937880188479,
+      "accepted": false,
+      "rejectionReasons": [
+        "temporal_gap_too_long (12143ms > 12000ms)",
+        "spatial_distance_after_pan_comp (6.937 > 0.580)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-24",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 20143,
+      "temporalGapMs": 13000,
+      "appearanceSimilarity": 0.7867682263929445,
+      "kitColorSimilarity": 0.7605855134790018,
+      "spatialDistance": 7.407487382271543,
+      "predictedPosition": {
+        "x": 7.572995324421561,
+        "y": 0.48324502056295227
+      },
+      "candidateStartPosition": {
+        "x": 0.1680551916360855,
+        "y": 0.6774895787239075
+      },
+      "scaleRatio": 0.8509803119824996,
+      "motionConsistency": 0.9992832991978826,
+      "accepted": false,
+      "rejectionReasons": [
+        "temporal_gap_too_long (13000ms > 12000ms)",
+        "spatial_distance_after_pan_comp (7.407 > 0.580)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-26",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 21143,
+      "temporalGapMs": 14000,
+      "appearanceSimilarity": 0.8163510580547667,
+      "kitColorSimilarity": 0.7719970489100997,
+      "spatialDistance": 7.7606121890543625,
+      "predictedPosition": {
+        "x": 8.088446461597766,
+        "y": 0.4691724422928336
+      },
+      "candidateStartPosition": {
+        "x": 0.3303840160369873,
+        "y": 0.6680911183357239
+      },
+      "scaleRatio": 1.0121440107946762,
+      "motionConsistency": 0.9442980869615489,
+      "accepted": false,
+      "rejectionReasons": [
+        "temporal_gap_too_long (14000ms > 12000ms)",
+        "spatial_distance_after_pan_comp (7.761 > 0.580)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-27",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 21143,
+      "temporalGapMs": 14000,
+      "appearanceSimilarity": 0.7645575420443749,
+      "kitColorSimilarity": 0.7958451548036982,
+      "spatialDistance": 7.6993932484558405,
+      "predictedPosition": {
+        "x": 8.088446461597766,
+        "y": 0.4691724422928336
+      },
+      "candidateStartPosition": {
+        "x": 0.392446368932724,
+        "y": 0.6977308988571167
+      },
+      "scaleRatio": 1.8310358094055679,
+      "motionConsistency": 0.999963833164659,
+      "accepted": false,
+      "rejectionReasons": [
+        "temporal_gap_too_long (14000ms > 12000ms)",
+        "spatial_distance_after_pan_comp (7.699 > 0.580)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-28",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 21286,
+      "temporalGapMs": 14143,
+      "appearanceSimilarity": 0.7624630019407417,
+      "kitColorSimilarity": 0.689670278054817,
+      "spatialDistance": 7.823639992975332,
+      "predictedPosition": {
+        "x": 8.15304358645249,
+        "y": 0.4688976350780967
+      },
+      "candidateStartPosition": {
+        "x": 0.3329598009586334,
+        "y": 0.7047626972198486
+      },
+      "scaleRatio": 1.1393048510992616,
+      "motionConsistency": 0.08667307581285155,
+      "accepted": false,
+      "rejectionReasons": [
+        "temporal_gap_too_long (14143ms > 12000ms)",
+        "spatial_distance_after_pan_comp (7.824 > 0.580)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-29",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 22429,
+      "temporalGapMs": 15286,
+      "appearanceSimilarity": 0.7063764334451217,
+      "kitColorSimilarity": 0.7237079800068603,
+      "spatialDistance": 8.305354880425687,
+      "predictedPosition": {
+        "x": 8.58810065924201,
+        "y": 0.4466984701323342
+      },
+      "candidateStartPosition": {
+        "x": 0.2856532707810402,
+        "y": 0.6664416193962097
+      },
+      "scaleRatio": 1.086327672695305,
+      "motionConsistency": 0.025987421687709233,
+      "accepted": false,
+      "rejectionReasons": [
+        "temporal_gap_too_long (15286ms > 12000ms)",
+        "spatial_distance_after_pan_comp (8.305 > 0.580)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-31",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 22714,
+      "temporalGapMs": 15571,
+      "appearanceSimilarity": 0.3064239099365368,
+      "kitColorSimilarity": 0.10217109580238805,
+      "spatialDistance": 8.313576151818426,
+      "predictedPosition": {
+        "x": 8.822470029286329,
+        "y": 0.4538159093239924
+      },
+      "candidateStartPosition": {
+        "x": 0.5123787522315979,
+        "y": 0.6945053339004517
+      },
+      "scaleRatio": 1.3837351289766804,
+      "motionConsistency": 0.9009556379976777,
+      "accepted": false,
+      "rejectionReasons": [
+        "aggregated_similarity_low (0.174 < 0.48)",
+        "kit_similarity_low (0.102 < 0.52)",
+        "appearance_similarity_low (0.306 < 0.4)",
+        "temporal_gap_too_long (15571ms > 12000ms)",
+        "spatial_distance_after_pan_comp (8.314 > 0.580)",
+        "long_gap_requires_strong_dual_match"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-32",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 24571,
+      "temporalGapMs": 17428,
+      "appearanceSimilarity": 0.8063770758867028,
+      "kitColorSimilarity": 0.8801337179986473,
+      "spatialDistance": 10.022323759567609,
+      "predictedPosition": {
+        "x": 10.25194584503162,
+        "y": 0.47234759714219954
+      },
+      "candidateStartPosition": {
+        "x": 0.23225292563438416,
+        "y": 0.7019719481468201
+      },
+      "scaleRatio": 0.7876638112567211,
+      "motionConsistency": 0.998805517682756,
+      "accepted": false,
+      "rejectionReasons": [
+        "temporal_gap_too_long (17428ms > 12000ms)",
+        "spatial_distance_after_pan_comp (10.022 > 0.580)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-33",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 24714,
+      "temporalGapMs": 17571,
+      "appearanceSimilarity": 0.712884154777641,
+      "kitColorSimilarity": 0.6535528058402208,
+      "spatialDistance": 9.94669109179492,
+      "predictedPosition": {
+        "x": 10.327437953893227,
+        "y": 0.4785125055513182
+      },
+      "candidateStartPosition": {
+        "x": 0.3833446800708771,
+        "y": 0.7058286666870117
+      },
+      "scaleRatio": 1.579368191761625,
+      "motionConsistency": 0.9990696229249387,
+      "accepted": false,
+      "rejectionReasons": [
+        "temporal_gap_too_long (17571ms > 12000ms)",
+        "spatial_distance_after_pan_comp (9.947 > 0.580)"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-34",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 25143,
+      "temporalGapMs": 18000,
+      "appearanceSimilarity": 0.5858531179265314,
+      "kitColorSimilarity": 0.4311313272929686,
+      "spatialDistance": 10.535508691096451,
+      "predictedPosition": {
+        "x": 10.626064622644467,
+        "y": 0.4767891564569273
+      },
+      "candidateStartPosition": {
+        "x": 0.09311354905366898,
+        "y": 0.7089207172393799
+      },
+      "scaleRatio": 1.1841748707817032,
+      "motionConsistency": 0.9999983491252129,
+      "accepted": false,
+      "rejectionReasons": [
+        "kit_similarity_low (0.431 < 0.52)",
+        "temporal_gap_too_long (18000ms > 12000ms)",
+        "spatial_distance_after_pan_comp (10.536 > 0.580)",
+        "long_gap_requires_strong_dual_match"
+      ]
+    },
+    {
+      "anchorTrackId": "track-4",
+      "candidateTrackId": "track-35",
+      "direction": "forward",
+      "anchorEndMs": 7143,
+      "candidateStartMs": 25143,
+      "temporalGapMs": 18000,
+      "appearanceSimilarity": 0.6703367988231568,
+      "kitColorSimilarity": 0.5737221075069886,
+      "spatialDistance": 10.299114357281958,
+      "predictedPosition": {
+        "x": 10.626064622644467,
+        "y": 0.4767891564569273
+      },
+      "candidateStartPosition": {
+        "x": 0.3292504549026489,
+        "y": 0.6944460868835449
+      },
+      "scaleRatio": 0.9704949232682146,
+      "motionConsistency": 0.9999703799449843,
+      "accepted": false,
+      "rejectionReasons": [
+        "temporal_gap_too_long (18000ms > 12000ms)",
+        "spatial_distance_after_pan_comp (10.299 > 0.580)",
+        "long_gap_requires_strong_dual_match"
+      ]
+    }
+  ],
+  "rankedCandidates": [
+    {
+      "rank": 1,
+      "candidateTrackId": "track-6",
+      "direction": "forward",
+      "aggregatedScore": 0.9011544576765884,
+      "accepted": false
+    },
+    {
+      "rank": 2,
+      "candidateTrackId": "track-12",
+      "direction": "forward",
+      "aggregatedScore": 0.8875810397086306,
+      "accepted": false
+    },
+    {
+      "rank": 3,
+      "candidateTrackId": "track-8",
+      "direction": "forward",
+      "aggregatedScore": 0.8840310130480229,
+      "accepted": false
+    },
+    {
+      "rank": 4,
+      "candidateTrackId": "track-1",
+      "direction": "backward",
+      "aggregatedScore": 0.8820176289185815,
+      "accepted": false
+    },
+    {
+      "rank": 5,
+      "candidateTrackId": "track-16",
+      "direction": "forward",
+      "aggregatedScore": 0.8572681967932085,
+      "accepted": false
+    },
+    {
+      "rank": 6,
+      "candidateTrackId": "track-32",
+      "direction": "forward",
+      "aggregatedScore": 0.8543188932594667,
+      "accepted": false
+    },
+    {
+      "rank": 7,
+      "candidateTrackId": "track-11",
+      "direction": "forward",
+      "aggregatedScore": 0.8216356980224714,
+      "accepted": false
+    },
+    {
+      "rank": 8,
+      "candidateTrackId": "track-26",
+      "direction": "forward",
+      "aggregatedScore": 0.7875209521107331,
+      "accepted": false
+    },
+    {
+      "rank": 9,
+      "candidateTrackId": "track-14",
+      "direction": "forward",
+      "aggregatedScore": 0.7865463547338383,
+      "accepted": false
+    },
+    {
+      "rank": 10,
+      "candidateTrackId": "track-27",
+      "direction": "forward",
+      "aggregatedScore": 0.784894490337935,
+      "accepted": false
+    },
+    {
+      "rank": 11,
+      "candidateTrackId": "track-24",
+      "direction": "forward",
+      "aggregatedScore": 0.7697494629988817,
+      "accepted": false
+    },
+    {
+      "rank": 12,
+      "candidateTrackId": "track-20",
+      "direction": "forward",
+      "aggregatedScore": 0.7290823908074258,
+      "accepted": false
+    },
+    {
+      "rank": 13,
+      "candidateTrackId": "track-23",
+      "direction": "forward",
+      "aggregatedScore": 0.7190302066640157,
+      "accepted": false
+    },
+    {
+      "rank": 14,
+      "candidateTrackId": "track-29",
+      "direction": "forward",
+      "aggregatedScore": 0.7176419387102518,
+      "accepted": false
+    },
+    {
+      "rank": 15,
+      "candidateTrackId": "track-28",
+      "direction": "forward",
+      "aggregatedScore": 0.7151477314148906,
+      "accepted": false
+    },
+    {
+      "rank": 16,
+      "candidateTrackId": "track-33",
+      "direction": "forward",
+      "aggregatedScore": 0.6743187779683179,
+      "accepted": false
+    },
+    {
+      "rank": 17,
+      "candidateTrackId": "track-22",
+      "direction": "forward",
+      "aggregatedScore": 0.6620156700371275,
+      "accepted": false
+    },
+    {
+      "rank": 18,
+      "candidateTrackId": "track-15",
+      "direction": "forward",
+      "aggregatedScore": 0.6405096946284332,
+      "accepted": false
+    },
+    {
+      "rank": 19,
+      "candidateTrackId": "track-2",
+      "direction": "forward",
+      "aggregatedScore": 0.6090897428900836,
+      "accepted": false
+    },
+    {
+      "rank": 20,
+      "candidateTrackId": "track-35",
+      "direction": "forward",
+      "aggregatedScore": 0.6075372494676474,
+      "accepted": false
+    },
+    {
+      "rank": 21,
+      "candidateTrackId": "track-19",
+      "direction": "forward",
+      "aggregatedScore": 0.5858716089981462,
+      "accepted": false
+    },
+    {
+      "rank": 22,
+      "candidateTrackId": "track-34",
+      "direction": "forward",
+      "aggregatedScore": 0.4852839540147156,
+      "accepted": false
+    },
+    {
+      "rank": 23,
+      "candidateTrackId": "track-13",
+      "direction": "forward",
+      "aggregatedScore": 0.4617496018524073,
+      "accepted": false
+    },
+    {
+      "rank": 24,
+      "candidateTrackId": "track-17",
+      "direction": "forward",
+      "aggregatedScore": 0.4071060118018225,
+      "accepted": false
+    },
+    {
+      "rank": 25,
+      "candidateTrackId": "track-31",
+      "direction": "forward",
+      "aggregatedScore": 0.17365958074934013,
+      "accepted": false
+    }
+  ]
+}

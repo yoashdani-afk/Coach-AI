@@ -1,2 +1,3 @@
-/** Explicit flag — do not tie debug UI to __DEV__ alone (Expo dev builds are used for real testing). */
-export const SHOW_TRACKING_DEBUG = false;
+/** Debug overlay — off by default. Enable with EXPO_PUBLIC_SHOW_TRACKING_DEBUG=true */
+export const SHOW_TRACKING_DEBUG =
+  process.env.EXPO_PUBLIC_SHOW_TRACKING_DEBUG === 'true';

@@ -56,13 +56,11 @@ export function clampScore(value: number, min = 4, max = 9.5): number {
 }
 
 const LEVEL_BASE: Record<PlayerProfile['playingLevel'], number> = {
-  BEGINNER: 5.8,
-  GRASSROOTS: 6.4,
-  SCHOOL: 6.8,
+  GRASSROOTS_SCHOOL: 6.6,
   ACADEMY: 7.4,
-  AMATEUR: 7.0,
-  SEMI_PROFESSIONAL: 7.8,
+  SEMI_PRO: 7.8,
   PROFESSIONAL: 8.4,
+  VETERAN_SUNDAY: 7.0,
 };
 
 export function levelBaseScore(level: PlayerProfile['playingLevel']): number {

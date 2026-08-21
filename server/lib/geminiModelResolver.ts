@@ -166,6 +166,27 @@ export async function resolveAnalysisModel(
   return selected;
 }
 
+/**
+ * Legacy full-video pipeline only.
+ * - GEMINI_LEGACY_MODEL if set
+ * - else GEMINI_MODEL if set
+ * - else models.list() discovery (Flash-biased ranking unchanged)
+ */
+export async function resolveLegacyAnalysisModel(
+  ai: GoogleGenAI,
+  excludeIds: string[] = []
+): Promise<string> {
+  const legacyOverride = process.env.GEMINI_LEGACY_MODEL?.trim();
+  if (legacyOverride) {
+    const normalized = normalizeModelId(legacyOverride);
+    if (!excludeIds.includes(normalized)) {
+      console.log('[Gemini] Using GEMINI_LEGACY_MODEL override:', normalized);
+      return normalized;
+    }
+  }
+  return resolveAnalysisModel(ai, excludeIds);
+}
+
 /** Warm-up: discover models at server start so misconfiguration fails fast. */
 export async function warmupModelDiscovery(apiKey: string): Promise<string | null> {
   try {

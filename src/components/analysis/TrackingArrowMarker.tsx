@@ -7,14 +7,16 @@ interface TrackingArrowMarkerProps {
   state: TrackingState;
 }
 
-/** Small arrow — tip points at the player's head. Hidden when LOST. */
+/** @deprecated Use TrackingMarkerOverlay chevron instead. */
 export function TrackingArrowMarker({ mapped, state }: TrackingArrowMarkerProps) {
-  if (state === 'LOST') return null;
+  if (state === 'LOST' || state === 'SEARCHING') return null;
 
-  const { headX, headY, arrowWidth, arrowHeight, headGapPx } = mapped;
+  const chevronW = 10;
+  const chevronH = 6;
+  const left = mapped.arrowTipX - chevronW / 2;
+  const top = mapped.arrowTipY - chevronH;
   const color = state === 'CONFIRMED' ? '#00C853' : '#FFD54F';
-  const left = headX - arrowWidth / 2;
-  const top = headY - arrowHeight - headGapPx;
+  const opacity = state === 'PROBABLE' ? 0.55 : 1;
 
   return (
     <View
@@ -23,25 +25,16 @@ export function TrackingArrowMarker({ mapped, state }: TrackingArrowMarkerProps)
         position: 'absolute',
         left,
         top,
-        width: arrowWidth,
-        height: arrowHeight,
-        alignItems: 'center',
-        justifyContent: 'flex-end',
+        width: 0,
+        height: 0,
+        borderLeftWidth: chevronW / 2,
+        borderRightWidth: chevronW / 2,
+        borderBottomWidth: chevronH,
+        borderLeftColor: 'transparent',
+        borderRightColor: 'transparent',
+        borderBottomColor: color,
+        opacity,
       }}
-    >
-      <View
-        style={{
-          width: 0,
-          height: 0,
-          borderLeftWidth: arrowWidth / 2,
-          borderRightWidth: arrowWidth / 2,
-          borderTopWidth: arrowHeight,
-          borderLeftColor: 'transparent',
-          borderRightColor: 'transparent',
-          borderTopColor: color,
-          opacity: state === 'PROBABLE' ? 0.75 : 1,
-        }}
-      />
-    </View>
+    />
   );
 }

@@ -13,6 +13,7 @@ export default function UploadLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="mode" />
       <Stack.Screen name="identify" />
+      <Stack.Screen name="track-building" options={{ gestureEnabled: false }} />
       <Stack.Screen name="track-preview" />
       <Stack.Screen name="question" />
       <Stack.Screen

@@ -18,6 +18,9 @@ export default function PickClipScreen() {
   const isAnalysing = useAnalysisStore((s) => s.isAnalysing);
   const clearDraft = useUploadStore((s) => s.clearDraft);
   const setClip = useUploadStore((s) => s.setClip);
+  const setAnalysisMode = useUploadStore((s) => s.setAnalysisMode);
+  const setPlayerSelection = useUploadStore((s) => s.setPlayerSelection);
+  const setPlayerTracking = useUploadStore((s) => s.setPlayerTracking);
   const [picking, setPicking] = useState(false);
 
   const handlePick = async () => {
@@ -38,6 +41,10 @@ export default function PickClipScreen() {
       const result = await pickVideoFromLibrary();
       if (result.ok) {
         setClip(result.clip);
+        setAnalysisMode(null);
+        setPlayerSelection(null);
+        setPlayerTracking(null);
+        console.log('[Navigation] destination', '/(upload)/mode');
         router.push('/(upload)/mode');
       } else if (result.reason === 'icloud_not_downloaded') {
         Alert.alert('Video not downloaded', getICloudNotDownloadedMessage(), [

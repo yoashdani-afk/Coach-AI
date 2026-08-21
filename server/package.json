@@ -6,11 +6,19 @@
   "scripts": {
     "dev": "tsx watch index.ts",
     "start": "tsx index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:frame-lifecycle": "tsx scripts/test-frame-extractor-lifecycle.ts",
+    "test:identity-tap": "tsx scripts/test-identity-tap-match.ts",
+    "test:timeline-coverage": "tsx scripts/test-timeline-coverage.ts",
+    "test:fragment-reconnect": "tsx scripts/test-fragment-reconnect.ts",
+    "test:fragment-reconnect-debug": "tsx scripts/test-fragment-reconnect-debug.ts",
+    "test:refinement-additive": "tsx scripts/test-refinement-additive.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@google/genai": "^2.13.0",
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow/tfjs-node": "^4.22.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -24,5 +32,16 @@
     "@types/node": "^22.10.5",
     "tsx": "^4.19.2",
     "typescript": "~5.9.2"
+  },
+  "overrides": {
+    "@tensorflow/tfjs-core": "4.22.0",
+    "@tensorflow/tfjs-converter": "4.22.0",
+    "@tensorflow/tfjs-backend-cpu": "4.22.0",
+    "@tensorflow-models/coco-ssd": {
+      "@tensorflow/tfjs": "4.22.0"
+    },
+    "@tensorflow-models/mobilenet": {
+      "@tensorflow/tfjs": "4.22.0"
+    }
   }
 }

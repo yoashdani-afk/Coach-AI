@@ -2,6 +2,8 @@ import type { Request, Response } from 'express';
 import { ApiError } from '@google/genai';
 import { analyseVideoWithGemini } from '../lib/geminiProvider.js';
 import { isServerAnalysisError } from '../lib/analysisErrors.js';
+import { createAnalysisRequestId } from '../lib/analysisRequestId.js';
+import { isInsufficientEvidenceResponse } from '../lib/types.js';
 import type { AnalysisRequestMetadata } from '../lib/types.js';
 
 const MAX_CLIP_DURATION_MS = 5 * 60 * 1000;
@@ -67,10 +69,13 @@ export async function handleAnalyseVideo(req: Request, res: Response): Promise<v
     }
 
     const metadata = parseMetadata(metadataRaw);
+    const requestId = createAnalysisRequestId();
 
     console.log('[Analysis] Video uploaded successfully', {
+      requestId,
       bytes: file.buffer.length,
       mode: metadata.mode,
+      pipeline: process.env.ANALYSIS_PIPELINE?.trim() || 'dense_timeline',
     });
 
     // TODO: future — crop/extract frames around playerSelection.timestampMs
@@ -78,13 +83,23 @@ export async function handleAnalyseVideo(req: Request, res: Response): Promise<v
     // TODO: future — ball tracking to validate passing/shooting claims
 
     const analysis = await analyseVideoWithGemini({
+      requestId,
       videoBuffer: file.buffer,
       mimeType: file.mimetype || 'video/mp4',
       originalName: file.originalname || metadata.clip.fileName || 'clip.mp4',
       metadata,
     });
 
-    console.log('[Analysis] Gemini response received', { mode: metadata.mode });
+    if (isInsufficientEvidenceResponse(analysis)) {
+      console.log('[Analysis] Insufficient evidence — no report generated', {
+        requestId: analysis.requestId,
+        reason: analysis.reason,
+      });
+      res.json(analysis);
+      return;
+    }
+
+    console.log('[Analysis] Gemini response received', { mode: metadata.mode, requestId });
 
     res.json(analysis);
   } catch (error) {

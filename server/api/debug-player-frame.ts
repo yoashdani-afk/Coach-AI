@@ -6,6 +6,7 @@ import {
   extractPlayerGroundingFrames,
   logPlayerGroundingExtraction,
 } from '../lib/playerFrameMarker.js';
+import { normalizeAnalysisVideo } from '../lib/normalizeAnalysisVideo.js';
 import type { AnalysisRequestMetadata } from '../lib/types.js';
 
 const MAX_CLIP_DURATION_MS = 5 * 60 * 1000;
@@ -69,10 +70,15 @@ export async function handleDebugPlayerFrame(req: Request, res: Response): Promi
     try {
       await fs.writeFile(tempPath, file.buffer);
 
+      const normalizedPath = path.join(tempDir, `normalized-${safeName}`);
+      const debugMarkedFramePath = path.join(tempDir, 'grounding-marked-debug.jpg');
+      const normalized = await normalizeAnalysisVideo(tempPath, normalizedPath);
+
       const result = await extractPlayerGroundingFrames(
-        tempPath,
+        normalized.normalizedAnalysisVideoPath,
         metadata.playerSelection,
-        metadata.clip.durationMs
+        metadata.clip.durationMs,
+        debugMarkedFramePath
       );
       logPlayerGroundingExtraction(metadata.playerSelection, result);
 
@@ -87,8 +93,9 @@ export async function handleDebugPlayerFrame(req: Request, res: Response): Promi
         markerPixelY: result.markerPixelY,
         clampedNormalizedX: result.clampedNormalizedX,
         clampedNormalizedY: result.clampedNormalizedY,
-        frameIsDisplayOriented: result.frameIsDisplayOriented,
-        geometry: result.geometry,
+        normalizedVideoWidth: normalized.outputWidth,
+        normalizedVideoHeight: normalized.outputHeight,
+        debugMarkedFramePath: result.debugMarkedFramePath,
         cleanFrameBase64: result.cleanFrameBase64,
         markedFrameBase64: result.markedFrameBase64,
         cleanCropBase64: result.cleanCropBase64,

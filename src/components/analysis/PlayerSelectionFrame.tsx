@@ -6,25 +6,46 @@ import {
   ActivityIndicator,
   LayoutChangeEvent,
   GestureResponderEvent,
+  Image,
+  type ImageStyle,
 } from 'react-native';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { PlayerSelectionMarker } from '@/components/analysis/PlayerSelectionMarker';
+import { PlayerMarkerOverlay } from '@/components/analysis/PlayerSelectionMarker';
 import { Button, Card } from '@/components/ui';
 import { formatDuration } from '@/lib/format';
 import {
-  computeContentRect,
-  initialSeekSeconds,
-  normalizedToContainer,
-  tapToNormalized,
-  assessTrackingQuality,
-} from '@/lib/videoLayout';
+  requestPlayerSelectionFrame,
+  type SelectionFrameOrientation,
+} from '@/lib/playerSelectionFrameClient';
+import { ANALYSIS_API_URL } from '@/lib/analysisConfig';
+import { assessTrackingQuality, initialSeekSeconds } from '@/lib/videoLayout';
+import type { MappedPlayerMarker } from '@/lib/videoViewportMapping';
 import type { PlayerSelection } from '@/types/analysis';
 
-const LOAD_TIMEOUT_MS = 12_000;
-const DEFAULT_ASPECT = 16 / 9;
+const LOAD_TIMEOUT_MS = 30_000;
+const PORTRAIT_SHELL_ASPECT = 16 / 9;
+const ZOOM_MAGNIFICATION = 2.8;
+const FRAME_ERROR_MESSAGE = "Couldn't load this frame. Try another moment.";
+
+type LoadState = 'loading' | 'ready' | 'error';
+
+interface SelectionFrame {
+  imageUri: string;
+  width: number;
+  height: number;
+  orientation: SelectionFrameOrientation;
+  timestampMs: number;
+}
+
+interface ThumbnailRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 interface PlayerSelectionFrameProps {
   uri: string;
+  fileName: string | null;
   clipDurationMs: number;
   initialSelection?: PlayerSelection | null;
   onSelectionChange: (selection: PlayerSelection | null) => void;
@@ -32,10 +53,69 @@ interface PlayerSelectionFrameProps {
   onChooseAnother: () => void;
 }
 
-type LoadState = 'loading' | 'ready' | 'error';
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function fitContain(
+  containerWidth: number,
+  containerHeight: number,
+  imageWidth: number,
+  imageHeight: number
+): { width: number; height: number } {
+  if (containerWidth <= 0 || containerHeight <= 0 || imageWidth <= 0 || imageHeight <= 0) {
+    return { width: 0, height: 0 };
+  }
+  const scale = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
+  return { width: imageWidth * scale, height: imageHeight * scale };
+}
+
+function computeFrameLayout(
+  cardWidth: number,
+  frame: SelectionFrame | null
+): { containerHeight: number; thumbnailRect: ThumbnailRect } {
+  if (!frame || cardWidth <= 0) {
+    return { containerHeight: cardWidth / PORTRAIT_SHELL_ASPECT, thumbnailRect: { x: 0, y: 0, width: 0, height: 0 } };
+  }
+
+  if (frame.orientation === 'landscape') {
+    const width = cardWidth;
+    const height = width * (frame.height / frame.width);
+    return {
+      containerHeight: height,
+      thumbnailRect: { x: 0, y: 0, width, height },
+    };
+  }
+
+  const containerHeight = cardWidth / PORTRAIT_SHELL_ASPECT;
+  const fitted = fitContain(cardWidth, containerHeight, frame.width, frame.height);
+  return {
+    containerHeight,
+    thumbnailRect: {
+      x: (cardWidth - fitted.width) / 2,
+      y: (containerHeight - fitted.height) / 2,
+      width: fitted.width,
+      height: fitted.height,
+    },
+  };
+}
+
+function resolveInitialTimestampMs(
+  clipDurationMs: number,
+  initialSelection?: PlayerSelection | null
+): number {
+  if (initialSelection?.timestampMs != null && initialSelection.timestampMs > 0) {
+    return initialSelection.timestampMs;
+  }
+  if (clipDurationMs > 0) {
+    return Math.round(initialSeekSeconds(clipDurationMs / 1000) * 1000);
+  }
+  return 0;
+}
 
 export function PlayerSelectionFrame({
   uri,
+  fileName,
   clipDurationMs,
   initialSelection,
   onSelectionChange,
@@ -43,9 +123,17 @@ export function PlayerSelectionFrame({
   onChooseAnother,
 }: PlayerSelectionFrameProps) {
   const [loadState, setLoadState] = useState<LoadState>('loading');
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
-  const [timestampMs, setTimestampMs] = useState(initialSelection?.timestampMs ?? 0);
+  const [cardWidth, setCardWidth] = useState(0);
+  const [selectionFrame, setSelectionFrame] = useState<SelectionFrame | null>(null);
+  const [frameLoading, setFrameLoading] = useState(false);
+  const [frameError, setFrameError] = useState<string | null>(null);
+  const [frameRetryNonce, setFrameRetryNonce] = useState(0);
+  const [selectionTimestampMs, setSelectionTimestampMs] = useState<number>(() =>
+    resolveInitialTimestampMs(clipDurationMs, initialSelection)
+  );
+  const [markerTimestampMs, setMarkerTimestampMs] = useState<number | null>(
+    initialSelection?.timestampMs ?? null
+  );
   const [normalized, setNormalized] = useState<{ x: number; y: number } | null>(
     initialSelection
       ? { x: initialSelection.normalizedX, y: initialSelection.normalizedY }
@@ -56,14 +144,8 @@ export function PlayerSelectionFrame({
   const [reducedTrackingConfidence, setReducedTrackingConfidence] = useState(
     initialSelection?.reducedTrackingConfidence ?? false
   );
-  const hasSeeked = useRef(false);
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const player = useVideoPlayer(uri, (p) => {
-    p.loop = false;
-    p.muted = true;
-    p.timeUpdateEventInterval = 0.2;
-  });
+  const activeFrameRequest = useRef(0);
 
   const clearLoadTimeout = useCallback(() => {
     if (loadTimeoutRef.current) {
@@ -72,189 +154,252 @@ export function PlayerSelectionFrame({
     }
   }, []);
 
-  const markReady = useCallback(() => {
-    clearLoadTimeout();
-    setLoadState((prev) => (prev === 'error' ? prev : 'ready'));
-  }, [clearLoadTimeout]);
-
-  const markError = useCallback(() => {
-    clearLoadTimeout();
-    setLoadState('error');
-  }, [clearLoadTimeout]);
+  useEffect(() => {
+    console.log('[PlayerSelection] MOUNT', { uri });
+    return () => {
+      console.log('[PlayerSelection] UNMOUNT');
+    };
+  }, [uri]);
 
   useEffect(() => {
     loadTimeoutRef.current = setTimeout(() => {
-      setLoadState((prev) => (prev === 'loading' ? 'error' : prev));
+      setLoadState((prev) => {
+        if (prev !== 'loading') return prev;
+        setFrameError((current) => current ?? FRAME_ERROR_MESSAGE);
+        return 'error';
+      });
     }, LOAD_TIMEOUT_MS);
 
     return clearLoadTimeout;
-  }, [uri, clearLoadTimeout]);
+  }, [uri, clearLoadTimeout, selectionTimestampMs, frameRetryNonce]);
 
   useEffect(() => {
-    hasSeeked.current = false;
     setLoadState('loading');
+    setSelectionFrame(null);
+    setFrameLoading(false);
+    setFrameError(null);
+    setSelectionTimestampMs(resolveInitialTimestampMs(clipDurationMs, initialSelection));
     setNormalized(
       initialSelection
         ? { x: initialSelection.normalizedX, y: initialSelection.normalizedY }
         : null
     );
-    setTimestampMs(initialSelection?.timestampMs ?? 0);
+    setMarkerTimestampMs(initialSelection?.timestampMs ?? null);
     setReducedTrackingConfidence(initialSelection?.reducedTrackingConfidence ?? false);
-  }, [uri, initialSelection]);
+  }, [uri, clipDurationMs, initialSelection]);
 
   useEffect(() => {
-    const statusSub = player.addListener('statusChange', ({ status, error }) => {
-      if (status === 'error') {
-        console.warn('[PlayerSelectionFrame] Video status error:', error);
-        markError();
-        return;
-      }
-      if (status === 'readyToPlay' && !hasSeeked.current) {
-        hasSeeked.current = true;
-        const seekTo = initialSeekSeconds(player.duration);
-        player.currentTime = seekTo;
-        player.pause();
-        setTimestampMs(Math.round(seekTo * 1000));
-        markReady();
-      }
-    });
+    const requestId = ++activeFrameRequest.current;
+    const controller = new AbortController();
+    let cancelled = false;
 
-    const sourceSub = player.addListener('sourceLoad', ({ availableVideoTracks, duration }) => {
-      const track = availableVideoTracks[0];
-      if (track?.size?.width && track.size.height) {
-        setVideoSize({ width: track.size.width, height: track.size.height });
-      }
-      if (!hasSeeked.current && duration > 0) {
-        hasSeeked.current = true;
-        const seekTo = initialSeekSeconds(duration);
-        player.currentTime = seekTo;
-        player.pause();
-        setTimestampMs(Math.round(seekTo * 1000));
-        markReady();
-      }
-    });
+    setFrameLoading(true);
+    setFrameError(null);
+    setLoadState('loading');
 
-    const timeSub = player.addListener('timeUpdate', ({ currentTime }) => {
-      setTimestampMs(Math.round(currentTime * 1000));
-    });
+    void (async () => {
+      try {
+        const frame = await requestPlayerSelectionFrame({
+          videoUri: uri,
+          fileName,
+          clipDurationMs,
+          timestampMs: selectionTimestampMs,
+          signal: controller.signal,
+        });
+
+        if (cancelled || requestId !== activeFrameRequest.current) {
+          return;
+        }
+
+        setSelectionFrame({
+          imageUri: frame.imageUri,
+          width: frame.width,
+          height: frame.height,
+          orientation: frame.orientation,
+          timestampMs: frame.timestampMs,
+        });
+        setLoadState('ready');
+      } catch (error) {
+        if (cancelled || requestId !== activeFrameRequest.current) return;
+        if (controller.signal.aborted) return;
+
+        console.error('[PlayerSelection] FRAME ERROR', {
+          name: error instanceof Error ? error.name : undefined,
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          apiUrl: ANALYSIS_API_URL,
+          videoUri: uri,
+          timestampMs: selectionTimestampMs,
+        });
+        setSelectionFrame(null);
+        setFrameError(FRAME_ERROR_MESSAGE);
+        setLoadState('error');
+      } finally {
+        if (!cancelled && requestId === activeFrameRequest.current) {
+          setFrameLoading(false);
+        }
+      }
+    })();
 
     return () => {
-      statusSub.remove();
-      sourceSub.remove();
-      timeSub.remove();
+      cancelled = true;
+      controller.abort();
     };
-  }, [player, markReady, markError]);
+  }, [uri, fileName, clipDurationMs, selectionTimestampMs, frameRetryNonce]);
 
-  const aspectWidth = videoSize.width > 0 ? videoSize.width : DEFAULT_ASPECT * 100;
-  const aspectHeight = videoSize.height > 0 ? videoSize.height : 100;
-
-  const contentRect = useMemo(
-    () => computeContentRect(containerSize.width, containerSize.height, aspectWidth, aspectHeight),
-    [containerSize.width, containerSize.height, aspectWidth, aspectHeight]
+  const { containerHeight, thumbnailRect } = useMemo(
+    () => computeFrameLayout(cardWidth, selectionFrame),
+    [cardWidth, selectionFrame]
   );
 
-  const markerPosition = useMemo(() => {
-    if (!normalized) return null;
-    return normalizedToContainer(normalized.x, normalized.y, contentRect);
-  }, [normalized, contentRect]);
+  const markerVisible =
+    normalized != null &&
+    markerTimestampMs != null &&
+    selectionFrame != null &&
+    markerTimestampMs === selectionFrame.timestampMs;
+
+  const mappedMarker: MappedPlayerMarker | null = useMemo(() => {
+    if (!markerVisible || thumbnailRect.width <= 0 || !normalized || !selectionFrame) return null;
+
+    const dotX = normalized.x * thumbnailRect.width;
+    const dotY = normalized.y * thumbnailRect.height;
+
+    return {
+      dotX,
+      dotY,
+      arrowTipX: dotX,
+      arrowTipY: dotY - 20,
+      normalizedX: normalized.x,
+      normalizedY: normalized.y,
+      layout: {
+        sourceWidth: selectionFrame.width,
+        sourceHeight: selectionFrame.height,
+        viewportWidth: thumbnailRect.width,
+        viewportHeight: thumbnailRect.height,
+        rotation: 0,
+        resizeMode: 'contain',
+        rotatedSourceWidth: selectionFrame.width,
+        rotatedSourceHeight: selectionFrame.height,
+        scale: 1,
+        renderedWidth: thumbnailRect.width,
+        renderedHeight: thumbnailRect.height,
+        offsetX: 0,
+        offsetY: 0,
+      },
+      box: null,
+    };
+  }, [markerVisible, thumbnailRect, normalized, selectionFrame]);
 
   const trackingQualityWarning = useMemo(() => {
-    if (!normalized || contentRect.width <= 0) return false;
-    return assessTrackingQuality(normalized.x, normalized.y, contentRect);
-  }, [normalized, contentRect]);
+    if (!normalized || thumbnailRect.width <= 0) return false;
+    return assessTrackingQuality(normalized.x, normalized.y, thumbnailRect);
+  }, [normalized, thumbnailRect]);
 
-  const zoomMagnification = 2.8;
-  const zoomWindowSize = 112;
+  const zoomPreviewLayout = useMemo(() => {
+    if (thumbnailRect.width <= 0 || thumbnailRect.height <= 0) {
+      return { width: 112, height: 112 };
+    }
+
+    if (selectionFrame?.orientation === 'landscape') {
+      const width = 240;
+      return {
+        width,
+        height: Math.max(96, width * (thumbnailRect.height / thumbnailRect.width)),
+      };
+    }
+
+    return { width: 112, height: 112 };
+  }, [selectionFrame?.orientation, thumbnailRect.width, thumbnailRect.height]);
+
+  const showFrameImage = selectionFrame != null && thumbnailRect.width > 0;
 
   const emitSelection = useCallback(
     (nextNormalized: { x: number; y: number }, nextTimestampMs: number, reduced = reducedTrackingConfidence) => {
-      if (contentRect.width <= 0 || contentRect.height <= 0) return;
+      if (!selectionFrame || thumbnailRect.width <= 0) return;
 
-      const warning = assessTrackingQuality(nextNormalized.x, nextNormalized.y, contentRect);
+      const warning = assessTrackingQuality(nextNormalized.x, nextNormalized.y, thumbnailRect);
       const selection: PlayerSelection = {
         normalizedX: nextNormalized.x,
         normalizedY: nextNormalized.y,
         timestampMs: nextTimestampMs,
-        displayWidth: contentRect.width,
-        displayHeight: contentRect.height,
-        ...(videoSize.width > 0 && videoSize.height > 0
-          ? { videoWidth: videoSize.width, videoHeight: videoSize.height }
-          : {}),
+        displayWidth: thumbnailRect.width,
+        displayHeight: thumbnailRect.height,
+        videoWidth: selectionFrame.width,
+        videoHeight: selectionFrame.height,
         ...(warning ? { trackingQualityWarning: true } : {}),
         ...(reduced ? { reducedTrackingConfidence: true } : {}),
       };
       onSelectionChange(selection);
     },
-    [
-      contentRect.width,
-      contentRect.height,
-      onSelectionChange,
-      reducedTrackingConfidence,
-      videoSize.width,
-      videoSize.height,
-    ]
+    [onSelectionChange, reducedTrackingConfidence, selectionFrame, thumbnailRect.width, thumbnailRect.height]
   );
 
   useEffect(() => {
-    if (normalized && contentRect.width > 0 && contentRect.height > 0) {
-      emitSelection(normalized, timestampMs);
+    if (normalized && selectionFrame && thumbnailRect.width > 0 && thumbnailRect.height > 0) {
+      emitSelection(normalized, selectionFrame.timestampMs);
     }
-  }, [contentRect.width, contentRect.height, normalized, timestampMs, emitSelection]);
+  }, [normalized, selectionFrame, thumbnailRect.width, thumbnailRect.height, emitSelection]);
 
-  const handleLayout = (event: LayoutChangeEvent) => {
-    const { width, height } = event.nativeEvent.layout;
-    setContainerSize({ width, height });
+  const handleCardLayout = (event: LayoutChangeEvent) => {
+    setCardWidth(event.nativeEvent.layout.width);
   };
 
   const handleTap = (event: GestureResponderEvent) => {
-    if (loadState !== 'ready') return;
+    if (loadState !== 'ready' || frameLoading || !selectionFrame || thumbnailRect.width <= 0) {
+      return;
+    }
 
     const { locationX, locationY } = event.nativeEvent;
-    const mapped = tapToNormalized(locationX, locationY, contentRect);
-    if (!mapped) return;
+    const next = {
+      x: clamp01(locationX / thumbnailRect.width),
+      y: clamp01(locationY / thumbnailRect.height),
+    };
 
-    const next = { x: mapped.normalizedX, y: mapped.normalizedY };
     setNormalized(next);
+    setMarkerTimestampMs(selectionFrame.timestampMs);
     setReducedTrackingConfidence(false);
-    emitSelection(next, timestampMs, false);
+    emitSelection(next, selectionFrame.timestampMs, false);
   };
 
+  const maxDurationMs = clipDurationMs > 0 ? clipDurationMs : 1;
+
   const seekToMs = (ms: number) => {
-    const maxMs = clipDurationMs > 0 ? clipDurationMs : player.duration * 1000;
-    const clamped = Math.max(0, Math.min(maxMs, ms));
-    player.currentTime = clamped / 1000;
-    player.pause();
-    setTimestampMs(clamped);
-    if (normalized) {
-      emitSelection(normalized, clamped);
-    }
+    const clamped = Math.max(0, Math.min(maxDurationMs, ms));
+    setNormalized(null);
+    setMarkerTimestampMs(null);
+    onSelectionChange(null);
+    setSelectionTimestampMs(clamped);
   };
 
   const handleScrubPress = (event: GestureResponderEvent) => {
     if (scrubWidth <= 0) return;
-    const pct = Math.max(0, Math.min(1, event.nativeEvent.locationX / scrubWidth));
-    const maxMs = clipDurationMs > 0 ? clipDurationMs : player.duration * 1000;
-    seekToMs(Math.round(pct * maxMs));
+    const pct = clamp01(event.nativeEvent.locationX / scrubWidth);
+    seekToMs(Math.round(pct * maxDurationMs));
   };
 
   const handleRetry = () => {
-    hasSeeked.current = false;
+    onRetry();
     setLoadState('loading');
-    clearLoadTimeout();
-    loadTimeoutRef.current = setTimeout(() => {
-      setLoadState((prev) => (prev === 'loading' ? 'error' : prev));
-    }, LOAD_TIMEOUT_MS);
-    player.replaceAsync(uri).catch(() => markError());
+    setSelectionFrame(null);
+    setFrameError(null);
+    setSelectionTimestampMs(resolveInitialTimestampMs(clipDurationMs, initialSelection));
+    setFrameRetryNonce((value) => value + 1);
   };
 
-  if (loadState === 'error') {
+  const handleRetryFrame = () => {
+    setFrameError(null);
+    setLoadState('loading');
+    setFrameRetryNonce((value) => value + 1);
+  };
+
+  if (loadState === 'error' && !selectionFrame) {
     return (
       <Card variant="outlined" className="items-center py-10 px-6 gap-4">
         <Text className="text-text-primary font-semibold text-center text-base">
           This clip could not be previewed.
         </Text>
         <Text className="text-text-secondary text-sm text-center leading-5">
-          Try again or choose a different video from your library.
+          {frameError ?? FRAME_ERROR_MESSAGE}
         </Text>
         <View className="w-full gap-3 mt-2">
           <Button label="Retry" onPress={handleRetry} fullWidth />
@@ -264,82 +409,114 @@ export function PlayerSelectionFrame({
     );
   }
 
-  const maxMs = clipDurationMs > 0 ? clipDurationMs : Math.max(player.duration * 1000, 1);
-  const scrubProgress = maxMs > 0 ? timestampMs / maxMs : 0;
+  const scrubProgress = maxDurationMs > 0 ? selectionTimestampMs / maxDurationMs : 0;
+  const showFrameOverlay = loadState === 'loading' || frameLoading;
+
+  const frameHeight =
+    containerHeight > 0 ? containerHeight : cardWidth > 0 ? cardWidth / PORTRAIT_SHELL_ASPECT : 200;
 
   return (
     <View className="gap-4">
-      <View
-        className="w-full rounded-2xl overflow-hidden bg-surface border border-border relative"
-        style={{ aspectRatio: DEFAULT_ASPECT }}
-        onLayout={handleLayout}
-      >
-        <VideoView
-          player={player}
-          style={{ width: '100%', height: '100%' }}
-          contentFit="contain"
-          nativeControls={false}
-          onFirstFrameRender={markReady}
-        />
-
-        <Pressable
-          onPress={handleTap}
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      <View className="w-full" onLayout={handleCardLayout}>
+        <View
+          className="w-full rounded-2xl overflow-hidden bg-surface border border-border relative"
+          style={{ width: '100%', height: frameHeight }}
         >
-          {loadState === 'loading' ? (
-            <View className="flex-1 items-center justify-center bg-background/70">
+          {showFrameImage && selectionFrame ? (
+            <Image
+              source={{ uri: selectionFrame.imageUri }}
+              style={{
+                position: 'absolute',
+                left: thumbnailRect.x,
+                top: thumbnailRect.y,
+                width: thumbnailRect.width,
+                height: thumbnailRect.height,
+              }}
+              resizeMode="cover"
+            />
+          ) : null}
+
+          {thumbnailRect.width > 0 ? (
+            <Pressable
+              onPress={handleTap}
+              style={{
+                position: 'absolute',
+                left: thumbnailRect.x,
+                top: thumbnailRect.y,
+                width: thumbnailRect.width,
+                height: thumbnailRect.height,
+              }}
+            >
+              {mappedMarker ? (
+                <PlayerMarkerOverlay marker={mappedMarker} state="MANUAL" showArrow={false} />
+              ) : null}
+            </Pressable>
+          ) : null}
+
+          {showFrameOverlay ? (
+            <View className="absolute inset-0 items-center justify-center bg-background/70">
               <ActivityIndicator size="large" color="#00C853" />
               <Text className="text-text-muted text-sm mt-3">Loading frame…</Text>
             </View>
           ) : null}
 
-          {markerPosition ? (
-            <PlayerSelectionMarker x={markerPosition.x} y={markerPosition.y} />
-          ) : loadState === 'ready' ? (
-            <View className="absolute bottom-3 left-0 right-0 items-center px-4">
-              <View className="bg-background/80 rounded-full px-4 py-2">
-                <Text className="text-text-secondary text-xs">Tap yourself in the frame</Text>
-              </View>
+          {frameError && !frameLoading ? (
+            <View className="absolute inset-0 items-center justify-center bg-background/90 px-6 gap-3">
+              <Text className="text-text-primary font-semibold text-center text-base">
+                Could not load this frame
+              </Text>
+              <Text className="text-text-secondary text-sm text-center leading-5">{frameError}</Text>
+              <Button label="Retry frame" onPress={handleRetryFrame} size="sm" />
             </View>
           ) : null}
-        </Pressable>
+        </View>
       </View>
 
-      {normalized && markerPosition && contentRect.width > 0 ? (
+      {!mappedMarker && loadState === 'ready' && selectionFrame && !frameLoading ? (
+        <Text className="text-text-muted text-sm text-center px-2">
+          Tap yourself in the frame above
+        </Text>
+      ) : null}
+
+      {normalized && mappedMarker && showFrameImage && selectionFrame ? (
         <Card variant="outlined" className="gap-3">
           <Text className="text-text-primary text-sm font-semibold">Zoom preview</Text>
           <View className="items-center">
             <View
               className="rounded-xl overflow-hidden border-2 border-primary bg-black"
-              style={{ width: zoomWindowSize, height: zoomWindowSize }}
+              style={{
+                width: zoomPreviewLayout.width,
+                height: zoomPreviewLayout.height,
+              }}
             >
-              <VideoView
-                player={player}
-                style={{
-                  width: contentRect.width * zoomMagnification,
-                  height: contentRect.height * zoomMagnification,
-                  transform: [
-                    {
-                      translateX:
-                        zoomWindowSize / 2 -
-                        (contentRect.x + normalized.x * contentRect.width) * zoomMagnification,
-                    },
-                    {
-                      translateY:
-                        zoomWindowSize / 2 -
-                        (contentRect.y + normalized.y * contentRect.height) * zoomMagnification,
-                    },
-                  ],
-                }}
-                contentFit="contain"
-                nativeControls={false}
+              <Image
+                source={{ uri: selectionFrame.imageUri }}
+                style={
+                  {
+                    width: thumbnailRect.width * ZOOM_MAGNIFICATION,
+                    height: thumbnailRect.height * ZOOM_MAGNIFICATION,
+                    transform: [
+                      {
+                        translateX:
+                          zoomPreviewLayout.width / 2 -
+                          normalized.x * thumbnailRect.width * ZOOM_MAGNIFICATION,
+                      },
+                      {
+                        translateY:
+                          zoomPreviewLayout.height / 2 -
+                          normalized.y * thumbnailRect.height * ZOOM_MAGNIFICATION,
+                      },
+                    ],
+                  } as ImageStyle
+                }
+                resizeMode="cover"
               />
               <View
                 pointerEvents="none"
                 style={{
                   position: 'absolute',
-                  left: zoomWindowSize / 2 - 6,
-                  top: zoomWindowSize / 2 - 6,
+                  left: zoomPreviewLayout.width / 2 - 6,
+                  top: zoomPreviewLayout.height / 2 - 6,
                   width: 12,
                   height: 12,
                   borderRadius: 6,
@@ -379,8 +556,8 @@ export function PlayerSelectionFrame({
               className="flex-1"
               onPress={() => {
                 setReducedTrackingConfidence(true);
-                if (normalized) {
-                  emitSelection(normalized, timestampMs, true);
+                if (normalized && selectionFrame) {
+                  emitSelection(normalized, selectionFrame.timestampMs, true);
                 }
               }}
             />
@@ -391,7 +568,7 @@ export function PlayerSelectionFrame({
       <Card variant="outlined" className="flex-row gap-3 items-start">
         <Text className="text-lg">👆</Text>
         <Text className="text-text-secondary text-sm leading-5 flex-1">
-          Your selection helps the coach follow the correct player throughout the clip.
+          Your selection helps the coach identify the correct player for analysis.
         </Text>
       </Card>
 
@@ -400,7 +577,7 @@ export function PlayerSelectionFrame({
           <View className="flex-row items-center justify-between">
             <Text className="text-text-muted text-sm">Selected moment</Text>
             <Text className="text-text-primary text-sm font-medium">
-              {formatDuration(timestampMs)}
+              {formatDuration(selectionTimestampMs)}
               {clipDurationMs > 0 ? ` / ${formatDuration(clipDurationMs)}` : ''}
             </Text>
           </View>
@@ -433,28 +610,28 @@ export function PlayerSelectionFrame({
               variant="secondary"
               size="sm"
               className="flex-1"
-              onPress={() => seekToMs(timestampMs - 3000)}
+              onPress={() => seekToMs(selectionTimestampMs - 3000)}
             />
             <Button
               label="−1s"
               variant="secondary"
               size="sm"
               className="flex-1"
-              onPress={() => seekToMs(timestampMs - 1000)}
+              onPress={() => seekToMs(selectionTimestampMs - 1000)}
             />
             <Button
               label="+1s"
               variant="secondary"
               size="sm"
               className="flex-1"
-              onPress={() => seekToMs(timestampMs + 1000)}
+              onPress={() => seekToMs(selectionTimestampMs + 1000)}
             />
             <Button
               label="+3s"
               variant="secondary"
               size="sm"
               className="flex-1"
-              onPress={() => seekToMs(timestampMs + 3000)}
+              onPress={() => seekToMs(selectionTimestampMs + 3000)}
             />
           </View>
         </View>

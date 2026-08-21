@@ -8,18 +8,21 @@ import {
   GestureResponderEvent,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { PlayerSelectionMarker } from '@/components/analysis/PlayerSelectionMarker';
+import { PlayerMarkerOverlay } from '@/components/analysis/PlayerSelectionMarker';
+import { PredictionRingOverlay } from '@/components/analysis/TrackingMarkerOverlay';
 import { Button, Card } from '@/components/ui';
 import { formatDuration } from '@/lib/format';
+import { interpolateReferenceAt } from '@/lib/identityProfile';
+import { assessTrackingQuality, buildViewportLayout, tapToNormalized } from '@/lib/videoLayout';
 import {
-  computeContentRect,
-  normalizedToContainer,
-  tapToNormalized,
-  assessTrackingQuality,
-} from '@/lib/videoLayout';
+  isFrameTimestampSynced,
+  layoutToContentRect,
+  mapPlayerMarkerToViewport,
+} from '@/lib/videoViewportMapping';
 import type { IdentityReference, PlayerSelection } from '@/types/analysis';
 
 const DEFAULT_ASPECT = 16 / 9;
+const FRAME_TOLERANCE_MS = 120;
 
 interface ReferenceCaptureFrameProps {
   uri: string;
@@ -28,12 +31,17 @@ interface ReferenceCaptureFrameProps {
   hint: string;
   initialTimestampMs: number;
   referenceLabel: IdentityReference['label'];
+  /** Prior selection used to predict player position on this frame. */
+  priorSelection?: PlayerSelection | null;
   onCapture: (reference: IdentityReference, selection: PlayerSelection) => void;
   onSkip?: () => void;
   skipLabel?: string;
+  /** When true, never show "Is this you?" — user taps on the suggested frame. */
+  tapOnly?: boolean;
 }
 
 type LoadState = 'loading' | 'ready' | 'error';
+type CaptureMode = 'predict' | 'tap';
 
 export function ReferenceCaptureFrame({
   uri,
@@ -42,29 +50,38 @@ export function ReferenceCaptureFrame({
   hint,
   initialTimestampMs,
   referenceLabel,
+  priorSelection,
   onCapture,
   onSkip,
   skipLabel = 'Skip',
+  tapOnly = false,
 }: ReferenceCaptureFrameProps) {
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [videoSize, setVideoSize] = useState({ width: 0, height: 0 });
-  const [timestampMs, setTimestampMs] = useState(initialTimestampMs);
+  const [currentFrameTimestampMs, setCurrentFrameTimestampMs] = useState(initialTimestampMs);
+  const [markerTimestampMs, setMarkerTimestampMs] = useState<number | null>(null);
   const [normalized, setNormalized] = useState<{ x: number; y: number } | null>(null);
+  const [frameSynced, setFrameSynced] = useState(true);
+  const [captureMode, setCaptureMode] = useState<CaptureMode>(tapOnly ? 'tap' : 'predict');
   const [scrubWidth, setScrubWidth] = useState(0);
   const hasSeeked = useRef(false);
+  const seekTargetRef = useRef<number | null>(null);
 
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
     p.muted = true;
-    p.timeUpdateEventInterval = 0.2;
+    p.timeUpdateEventInterval = 0.08;
   });
 
   useEffect(() => {
     hasSeeked.current = false;
     setLoadState('loading');
     setNormalized(null);
-    setTimestampMs(initialTimestampMs);
+    setMarkerTimestampMs(null);
+    setCurrentFrameTimestampMs(initialTimestampMs);
+    setFrameSynced(true);
+    setCaptureMode('predict');
   }, [uri, initialTimestampMs]);
 
   useEffect(() => {
@@ -78,13 +95,22 @@ export function ReferenceCaptureFrame({
         const seekTo = Math.min(duration, initialTimestampMs / 1000);
         player.currentTime = seekTo;
         player.pause();
-        setTimestampMs(Math.round(seekTo * 1000));
+        setCurrentFrameTimestampMs(Math.round(seekTo * 1000));
         setLoadState('ready');
       }
     });
 
     const timeSub = player.addListener('timeUpdate', ({ currentTime }) => {
-      setTimestampMs(Math.round(currentTime * 1000));
+      const ms = Math.round(currentTime * 1000);
+      setCurrentFrameTimestampMs(ms);
+      if (
+        seekTargetRef.current != null &&
+        isFrameTimestampSynced(ms, seekTargetRef.current, FRAME_TOLERANCE_MS)
+      ) {
+        seekTargetRef.current = null;
+        setFrameSynced(true);
+        setCaptureMode('predict');
+      }
     });
 
     return () => {
@@ -93,69 +119,116 @@ export function ReferenceCaptureFrame({
     };
   }, [player, initialTimestampMs]);
 
-  const aspectWidth = videoSize.width > 0 ? videoSize.width : DEFAULT_ASPECT * 100;
-  const aspectHeight = videoSize.height > 0 ? videoSize.height : 100;
-  const contentRect = useMemo(
-    () => computeContentRect(containerSize.width, containerSize.height, aspectWidth, aspectHeight),
-    [containerSize.width, containerSize.height, aspectWidth, aspectHeight]
+  const sourceWidth = videoSize.width > 0 ? videoSize.width : DEFAULT_ASPECT * 100;
+  const sourceHeight = videoSize.height > 0 ? videoSize.height : 100;
+
+  const viewportLayout = useMemo(
+    () => buildViewportLayout(containerSize.width, containerSize.height, sourceWidth, sourceHeight),
+    [containerSize.width, containerSize.height, sourceWidth, sourceHeight]
   );
 
-  const markerPosition = useMemo(() => {
-    if (!normalized) return null;
-    return normalizedToContainer(normalized.x, normalized.y, contentRect);
-  }, [normalized, contentRect]);
+  const contentRect = useMemo(() => layoutToContentRect(viewportLayout), [viewportLayout]);
+
+  const prediction = useMemo(() => {
+    if (!priorSelection || !frameSynced || containerSize.width <= 0) return null;
+    const interpolated = interpolateReferenceAt(priorSelection, currentFrameTimestampMs);
+    if (!interpolated) return null;
+    const nx = interpolated.box.x + interpolated.box.width / 2;
+    const ny = interpolated.box.y + interpolated.box.height * 0.55;
+    return mapPlayerMarkerToViewport({
+      normalizedX: nx,
+      normalizedY: ny,
+      layout: viewportLayout,
+      box: interpolated.box,
+    });
+  }, [priorSelection, currentFrameTimestampMs, frameSynced, containerSize.width, viewportLayout]);
+
+  const showPrediction = !tapOnly && captureMode === 'predict' && prediction != null && normalized == null;
+
+  const markerVisible =
+    normalized != null &&
+    markerTimestampMs != null &&
+    frameSynced &&
+    isFrameTimestampSynced(currentFrameTimestampMs, markerTimestampMs, FRAME_TOLERANCE_MS);
+
+  const mappedMarker = useMemo(() => {
+    if (!normalized || !markerVisible) return null;
+    return mapPlayerMarkerToViewport({
+      normalizedX: normalized.x,
+      normalizedY: normalized.y,
+      layout: viewportLayout,
+    });
+  }, [normalized, markerVisible, viewportLayout]);
+
+  const submitReference = useCallback(
+    (nx: number, ny: number, ts: number) => {
+      const reference: IdentityReference = {
+        normalizedX: nx,
+        normalizedY: ny,
+        timestampMs: ts,
+        label: referenceLabel,
+      };
+      const warning = assessTrackingQuality(nx, ny, contentRect);
+      const selection: PlayerSelection = {
+        normalizedX: nx,
+        normalizedY: ny,
+        timestampMs: ts,
+        displayWidth: contentRect.width,
+        displayHeight: contentRect.height,
+        ...(videoSize.width > 0 && videoSize.height > 0
+          ? { videoWidth: videoSize.width, videoHeight: videoSize.height }
+          : {}),
+        ...(warning ? { trackingQualityWarning: true } : {}),
+      };
+      onCapture(reference, selection);
+    },
+    [contentRect, referenceLabel, onCapture, videoSize.width, videoSize.height]
+  );
 
   const handleTap = (event: GestureResponderEvent) => {
-    if (loadState !== 'ready') return;
+    if (loadState !== 'ready' || !frameSynced || captureMode === 'predict') return;
     const mapped = tapToNormalized(event.nativeEvent.locationX, event.nativeEvent.locationY, contentRect);
     if (!mapped) return;
     setNormalized({ x: mapped.normalizedX, y: mapped.normalizedY });
+    setMarkerTimestampMs(currentFrameTimestampMs);
+  };
+
+  const handleConfirmPrediction = () => {
+    if (!prediction || !priorSelection) return;
+    const interpolated = interpolateReferenceAt(priorSelection, currentFrameTimestampMs);
+    if (!interpolated) return;
+    const nx = interpolated.box.x + interpolated.box.width / 2;
+    const ny = interpolated.box.y + interpolated.box.height * 0.55;
+    submitReference(nx, ny, currentFrameTimestampMs);
+  };
+
+  const handleRejectPrediction = () => {
+    setCaptureMode('tap');
   };
 
   const seekToMs = (ms: number) => {
     const maxMs = clipDurationMs > 0 ? clipDurationMs : player.duration * 1000;
     const clamped = Math.max(0, Math.min(maxMs, ms));
+    setFrameSynced(false);
+    seekTargetRef.current = clamped;
+    setNormalized(null);
+    setMarkerTimestampMs(null);
+    setCaptureMode('predict');
     player.currentTime = clamped / 1000;
     player.pause();
-    setTimestampMs(clamped);
+    setCurrentFrameTimestampMs(clamped);
   };
 
   const handleConfirm = useCallback(() => {
-    if (!normalized || contentRect.width <= 0) return;
-
-    const reference: IdentityReference = {
-      normalizedX: normalized.x,
-      normalizedY: normalized.y,
-      timestampMs,
-      label: referenceLabel,
-    };
-
-    const warning = assessTrackingQuality(normalized.x, normalized.y, contentRect);
-    const selection: PlayerSelection = {
-      normalizedX: normalized.x,
-      normalizedY: normalized.y,
-      timestampMs,
-      displayWidth: contentRect.width,
-      displayHeight: contentRect.height,
-      ...(videoSize.width > 0 && videoSize.height > 0
-        ? { videoWidth: videoSize.width, videoHeight: videoSize.height }
-        : {}),
-      ...(warning ? { trackingQualityWarning: true } : {}),
-    };
-
-    onCapture(reference, selection);
-  }, [
-    normalized,
-    contentRect,
-    timestampMs,
-    referenceLabel,
-    onCapture,
-    videoSize.width,
-    videoSize.height,
-  ]);
+    if (!normalized || !markerTimestampMs || contentRect.width <= 0) return;
+    if (!isFrameTimestampSynced(currentFrameTimestampMs, markerTimestampMs, FRAME_TOLERANCE_MS)) {
+      return;
+    }
+    submitReference(normalized.x, normalized.y, markerTimestampMs);
+  }, [normalized, markerTimestampMs, currentFrameTimestampMs, contentRect, submitReference]);
 
   const maxMs = clipDurationMs > 0 ? clipDurationMs : Math.max(player.duration * 1000, 1);
-  const scrubProgress = maxMs > 0 ? timestampMs / maxMs : 0;
+  const scrubProgress = maxMs > 0 ? currentFrameTimestampMs / maxMs : 0;
 
   return (
     <View className="gap-4">
@@ -179,11 +252,16 @@ export function ReferenceCaptureFrame({
               <ActivityIndicator size="large" color="#00C853" />
             </View>
           ) : null}
-          {markerPosition ? <PlayerSelectionMarker x={markerPosition.x} y={markerPosition.y} /> : null}
-          {!markerPosition && loadState === 'ready' ? (
+          {showPrediction && prediction ? (
+            <PredictionRingOverlay marker={prediction} layout={viewportLayout} />
+          ) : null}
+          {mappedMarker ? <PlayerMarkerOverlay marker={mappedMarker} state="MANUAL" /> : null}
+          {!mappedMarker && !showPrediction && loadState === 'ready' ? (
             <View className="absolute bottom-3 left-0 right-0 items-center px-4">
               <View className="bg-background/80 rounded-full px-4 py-2">
-                <Text className="text-text-secondary text-xs">Tap yourself in this moment</Text>
+                <Text className="text-text-secondary text-xs">
+                  {!frameSynced ? 'Loading frame…' : 'Tap yourself in this clear moment'}
+                </Text>
               </View>
             </View>
           ) : null}
@@ -194,7 +272,7 @@ export function ReferenceCaptureFrame({
         <View className="flex-row items-center justify-between">
           <Text className="text-text-muted text-sm">Moment</Text>
           <Text className="text-text-primary text-sm font-medium">
-            {formatDuration(timestampMs)}
+            {formatDuration(currentFrameTimestampMs)}
             {clipDurationMs > 0 ? ` / ${formatDuration(clipDurationMs)}` : ''}
           </Text>
         </View>
@@ -214,7 +292,15 @@ export function ReferenceCaptureFrame({
       </View>
 
       <View className="gap-3">
-        <Button label="Confirm this moment" onPress={handleConfirm} disabled={!normalized} fullWidth size="lg" />
+        {showPrediction ? (
+          <>
+            <Text className="text-text-primary text-sm font-semibold text-center">Is this you?</Text>
+            <Button label="Yes, that's me" onPress={handleConfirmPrediction} fullWidth size="lg" />
+            <Button label="No, choose again" variant="secondary" onPress={handleRejectPrediction} fullWidth />
+          </>
+        ) : (
+          <Button label="Confirm this moment" onPress={handleConfirm} disabled={!mappedMarker} fullWidth size="lg" />
+        )}
         {onSkip ? (
           <Button label={skipLabel} variant="secondary" onPress={onSkip} fullWidth />
         ) : null}

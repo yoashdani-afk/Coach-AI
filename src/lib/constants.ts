@@ -28,13 +28,38 @@ export const PREFERRED_FEET: { value: PreferredFoot; label: string }[] = [
 ];
 
 export const PLAYING_LEVELS: { value: PlayingLevel; label: string; description: string }[] = [
-  { value: 'BEGINNER', label: 'Beginner', description: 'Just starting out' },
-  { value: 'GRASSROOTS', label: 'Grassroots', description: 'Local / recreational' },
-  { value: 'SCHOOL', label: 'School', description: 'School or college team' },
+  {
+    value: 'GRASSROOTS_SCHOOL',
+    label: 'Grassroots / School',
+    description: 'Local, school, or recreational football',
+  },
   { value: 'ACADEMY', label: 'Academy', description: 'Youth academy pathway' },
-  { value: 'AMATEUR', label: 'Amateur', description: 'Sunday league / hobby' },
-  { value: 'SEMI_PROFESSIONAL', label: 'Semi-professional', description: 'Paid part-time' },
-  { value: 'PROFESSIONAL', label: 'Professional', description: 'Full-time pro' },
+  { value: 'SEMI_PRO', label: 'Semi-Pro', description: 'Paid part-time or high-level amateur' },
+  { value: 'PROFESSIONAL', label: 'Professional', description: 'Full-time professional' },
+  {
+    value: 'VETERAN_SUNDAY',
+    label: 'Veteran / Sunday League',
+    description: 'Adult amateur, veteran, or Sunday league',
+  },
+];
+
+export const CLUB_LEVELS: { value: string; label: string }[] = [
+  { value: 'U9', label: 'U9' },
+  { value: 'U10', label: 'U10' },
+  { value: 'U11', label: 'U11' },
+  { value: 'U12', label: 'U12' },
+  { value: 'U13', label: 'U13' },
+  { value: 'U14', label: 'U14' },
+  { value: 'U15', label: 'U15' },
+  { value: 'U16', label: 'U16' },
+  { value: 'U17', label: 'U17' },
+  { value: 'U18', label: 'U18' },
+  { value: 'U19', label: 'U19' },
+  { value: 'U20', label: 'U20' },
+  { value: 'U21', label: 'U21' },
+  { value: 'U22', label: 'U22' },
+  { value: 'U23', label: 'U23' },
+  { value: 'MENS_SENIOR', label: "Men's/Senior" },
 ];
 
 export const PLAYING_STYLES = [
@@ -168,6 +193,11 @@ export function labelForPosition(value: Position): string {
 
 export function labelForLevel(value: PlayingLevel): string {
   return PLAYING_LEVELS.find((l) => l.value === value)?.label ?? value;
+}
+
+export function labelForClubLevel(value: string | null): string {
+  if (!value) return '—';
+  return CLUB_LEVELS.find((l) => l.value === value)?.label ?? value;
 }
 
 export function labelForFoot(value: PreferredFoot): string {

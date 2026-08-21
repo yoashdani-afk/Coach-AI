@@ -4,6 +4,7 @@ import type {
   PlayerSelection,
   PlayerTrackingData,
   TrackingInterval,
+  TrackingKeyframe,
 } from '@/types/analysis';
 import { estimateBoxFromTap, keyframeFromTap } from '@/lib/trackingBox';
 
@@ -101,6 +102,21 @@ export function createTrackingFromIdentityProfile(
   };
 }
 
+export function buildSingleReferenceProfile(primary: PlayerSelection): PlayerIdentityProfile {
+  const identityConfidence = resolveIdentityConfidence(primary);
+  return {
+    references: [
+      {
+        normalizedX: primary.normalizedX,
+        normalizedY: primary.normalizedY,
+        timestampMs: primary.timestampMs,
+        label: 'primary',
+      },
+    ],
+    identityConfidence,
+  };
+}
+
 export function buildIdentityProfile(
   primary: PlayerSelection,
   secondary: IdentityReference,
@@ -142,7 +158,14 @@ export function applyTrackingCorrection(
 ): PlayerTrackingData {
   const box = estimateBoxFromTap(normalizedX, normalizedY);
   const correction = { timestampMs, box };
-  const correctionKeyframe = keyframeFromTap(timestampMs, normalizedX, normalizedY, 'CONFIRMED');
+  const correctionKeyframe: TrackingKeyframe = {
+    timestampMs,
+    box,
+    state: 'CONFIRMED',
+    confidence: 1,
+    coordinateSource: 'detection',
+    trackId: tracking.selectedTrackId ?? undefined,
+  };
 
   const keyframes = [...tracking.keyframes, correctionKeyframe].sort(
     (a, b) => a.timestampMs - b.timestampMs
@@ -160,6 +183,45 @@ export function applyTrackingCorrection(
 export function firstReferenceTimestampMs(selection: PlayerSelection): number {
   const refs = referencesFromSelection(selection);
   return refs[0]?.timestampMs ?? selection.timestampMs;
+}
+
+/** Interpolate position from identity references when server keyframes are sparse. */
+export function interpolateReferenceAt(
+  selection: PlayerSelection,
+  timestampMs: number
+): { box: ReturnType<typeof estimateBoxFromTap>; ref: IdentityReference } | null {
+  const refs = referencesFromSelection(selection);
+  if (refs.length === 0) return null;
+
+  const sorted = [...refs].sort((a, b) => a.timestampMs - b.timestampMs);
+  const first = sorted[0];
+  if (timestampMs <= first.timestampMs) {
+    return {
+      box: estimateBoxFromTap(first.normalizedX, first.normalizedY),
+      ref: first,
+    };
+  }
+
+  const last = sorted[sorted.length - 1];
+  if (timestampMs >= last.timestampMs) {
+    return {
+      box: estimateBoxFromTap(last.normalizedX, last.normalizedY),
+      ref: last,
+    };
+  }
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i];
+    const b = sorted[i + 1];
+    if (timestampMs < a.timestampMs || timestampMs > b.timestampMs) continue;
+    const span = b.timestampMs - a.timestampMs;
+    const t = span > 0 ? (timestampMs - a.timestampMs) / span : 0;
+    const nx = a.normalizedX + (b.normalizedX - a.normalizedX) * t;
+    const ny = a.normalizedY + (b.normalizedY - a.normalizedY) * t;
+    return { box: estimateBoxFromTap(nx, ny), ref: t < 0.5 ? a : b };
+  }
+
+  return null;
 }
 
 export function skipTrackingFromTimestamp(

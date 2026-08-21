@@ -5,13 +5,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { Card, Chip, Button } from '@/components/ui';
 import {
+  labelForClubLevel,
   labelForFeedbackArea,
   labelForFoot,
   labelForGoal,
   labelForLevel,
   labelForPosition,
 } from '@/lib/constants';
-import { useProfileStore } from '@/stores/profileStore';
+import {
+  formatDateOfBirthForDisplay,
+  formatHeightForDisplay,
+  formatWeightForDisplay,
+} from '@/lib/profileUtils';
+import { useProfileStore, profileNeedsCompletion } from '@/stores/profileStore';
 import { FREE_TIER_ANALYSES_PER_MONTH } from '@/lib/constants';
 import { getRemainingAnalyses, isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
 
@@ -31,6 +37,7 @@ export default function ProfileScreen() {
   const resetAll = useProfileStore((s) => s.resetAll);
   const resetFreeAnalyses = useProfileStore((s) => s.resetFreeAnalyses);
   const remaining = getRemainingAnalyses(profile);
+  const needsCompletion = profileNeedsCompletion(profile);
 
   const handleResetFreeAnalyses = () => {
     Alert.alert(
@@ -86,6 +93,29 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24, gap: 16 }}
         showsVerticalScrollIndicator={false}
       >
+        {needsCompletion ? (
+          <Card variant="outlined" className="border-warning/40 bg-warning/5">
+            <View className="flex-row items-start gap-3">
+              <Ionicons name="alert-circle-outline" size={22} color="#FFB020" />
+              <View className="flex-1 gap-3">
+                <View>
+                  <Text className="text-text-primary font-semibold">Profile incomplete</Text>
+                  <Text className="text-text-secondary text-sm mt-1">
+                    We need a few more details — including your date of birth — to keep your coaching
+                    personal and accurate.
+                  </Text>
+                </View>
+                <Button
+                  label="Complete profile"
+                  variant="secondary"
+                  fullWidth
+                  onPress={() => router.push('/(onboarding)/setup?edit=1')}
+                />
+              </View>
+            </View>
+          </Card>
+        ) : null}
+
         <Card variant="elevated" className="items-center py-6">
           <View className="w-20 h-20 rounded-full bg-primary-muted border border-primary/30 items-center justify-center mb-3">
             <Ionicons name="person" size={36} color="#00C853" />
@@ -108,9 +138,36 @@ export default function ProfileScreen() {
         </Card>
 
         <Card variant="outlined">
-          <Text className="text-text-muted text-xs uppercase tracking-wider mb-2">Details</Text>
-          <ProfileRow label="Age" value={String(profile.age)} />
-          <ProfileRow label="Country" value={profile.country} />
+          <Text className="text-text-muted text-xs uppercase tracking-wider mb-2">About</Text>
+          <ProfileRow
+            label="Date of birth"
+            value={
+              profile.dateOfBirth
+                ? `${formatDateOfBirthForDisplay(profile.dateOfBirth)} (${profile.age})`
+                : '—'
+            }
+          />
+          <ProfileRow label="Nationality" value={profile.nationality || '—'} />
+          <ProfileRow label="Country playing in" value={profile.countryPlayingIn || '—'} />
+          <ProfileRow label="Club" value={profile.club ?? '—'} />
+          <ProfileRow label="Club level" value={labelForClubLevel(profile.clubLevel)} />
+        </Card>
+
+        <Card variant="outlined">
+          <Text className="text-text-muted text-xs uppercase tracking-wider mb-2">Experience</Text>
+          <ProfileRow
+            label="Years playing"
+            value={profile.yearsPlayingFootball >= 0 ? String(profile.yearsPlayingFootball) : '—'}
+          />
+          <ProfileRow
+            label="Years in main position"
+            value={profile.yearsInPrimaryPosition >= 0 ? String(profile.yearsInPrimaryPosition) : '—'}
+          />
+        </Card>
+
+        <Card variant="outlined">
+          <Text className="text-text-muted text-xs uppercase tracking-wider mb-2">On the pitch</Text>
+          <ProfileRow label="Goalkeeper" value={profile.isGoalkeeper ? 'Yes' : 'No'} />
           <ProfileRow label="Main position" value={labelForPosition(profile.mainPosition)} />
           <ProfileRow
             label="Secondary position"
@@ -118,7 +175,14 @@ export default function ProfileScreen() {
           />
           <ProfileRow label="Preferred foot" value={labelForFoot(profile.preferredFoot)} />
           <ProfileRow label="Level" value={labelForLevel(profile.playingLevel)} />
-          <ProfileRow label="Club" value={profile.club ?? '—'} />
+          <ProfileRow
+            label="Height"
+            value={formatHeightForDisplay(profile.heightCm, profile.heightDisplayUnit)}
+          />
+          <ProfileRow
+            label="Weight"
+            value={formatWeightForDisplay(profile.weightKg, profile.weightDisplayUnit)}
+          />
         </Card>
 
         <Card variant="outlined">

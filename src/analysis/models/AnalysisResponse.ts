@@ -5,6 +5,7 @@ export interface AnalysisScore {
 }
 
 export interface AnalysisResponse {
+  status?: 'success';
   title: string;
   summary: string;
   whatHappened: string;
@@ -16,9 +17,33 @@ export interface AnalysisResponse {
   improvements: string[];
   scores: AnalysisScore[];
   awards: string[];
+  requestId?: string;
+}
+
+export interface InsufficientEvidenceResponse {
+  status: 'insufficient_evidence';
+  message: string;
+  scores: null;
+  overallScore: null;
+  report: null;
+  requestId: string;
+  reason?: string;
+}
+
+export type AnalyseVideoApiResponse = AnalysisResponse | InsufficientEvidenceResponse;
+
+export function isInsufficientEvidenceResponse(
+  value: unknown
+): value is InsufficientEvidenceResponse {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    (value as InsufficientEvidenceResponse).status === 'insufficient_evidence'
+  );
 }
 
 export function isAnalysisResponse(value: unknown): value is AnalysisResponse {
+  if (isInsufficientEvidenceResponse(value)) return false;
   if (!value || typeof value !== 'object') return false;
   const r = value as Record<string, unknown>;
   return (

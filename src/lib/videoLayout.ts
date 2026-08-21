@@ -1,48 +1,37 @@
 /**
- * Computes the letterboxed video content rectangle for `contentFit="contain"`.
+ * Re-exports the shared viewport mapping utilities.
+ * All tap, dot, arrow, and bounding-box placement must use videoViewportMapping.
  */
-export interface ContentRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+export {
+  computeContentRect,
+  computeVideoViewportLayout,
+  isFrameTimestampSynced,
+  layoutToContentRect,
+  mapPlayerMarkerToViewport,
+  mapVideoBoxToViewport,
+  mapVideoPointToViewport,
+  mapViewportPointToVideo,
+  PLAYER_MARKER_ARROW_SHAFT_PX,
+  type ContentRect,
+  type MappedPlayerMarker,
+  type NormalizedVideoPoint,
+  type VideoRotation,
+  type VideoViewportLayout,
+  type ViewportBoundingBox,
+  type ViewportPoint,
+} from '@/lib/videoViewportMapping';
+
+import {
+  computeVideoViewportLayout,
+  type ContentRect,
+  type VideoViewportLayout,
+} from '@/lib/videoViewportMapping';
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
 }
 
-export function computeContentRect(
-  containerWidth: number,
-  containerHeight: number,
-  videoWidth: number,
-  videoHeight: number
-): ContentRect {
-  if (containerWidth <= 0 || containerHeight <= 0 || videoWidth <= 0 || videoHeight <= 0) {
-    return { x: 0, y: 0, width: containerWidth, height: containerHeight };
-  }
-
-  const containerAspect = containerWidth / containerHeight;
-  const videoAspect = videoWidth / videoHeight;
-
-  if (containerAspect > videoAspect) {
-    const height = containerHeight;
-    const width = height * videoAspect;
-    return {
-      x: (containerWidth - width) / 2,
-      y: 0,
-      width,
-      height,
-    };
-  }
-
-  const width = containerWidth;
-  const height = width / videoAspect;
-  return {
-    x: 0,
-    y: (containerHeight - height) / 2,
-    width,
-    height,
-  };
-}
-
-/** Map a tap within the container to normalised video coordinates (0–1). Returns null if outside the video area. */
+/** Map a tap within the container to normalised video coordinates. Returns null if outside video area. */
 export function tapToNormalized(
   tapX: number,
   tapY: number,
@@ -76,8 +65,21 @@ export function normalizedToContainer(
   };
 }
 
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
+export function buildViewportLayout(
+  containerWidth: number,
+  containerHeight: number,
+  sourceWidth: number,
+  sourceHeight: number,
+  rotation: 0 | 90 | 180 | 270 = 0
+): VideoViewportLayout {
+  return computeVideoViewportLayout({
+    sourceWidth,
+    sourceHeight,
+    viewportWidth: containerWidth,
+    viewportHeight: containerHeight,
+    rotation,
+    resizeMode: 'contain',
+  });
 }
 
 export function initialSeekSeconds(durationSeconds: number): number {

@@ -1,0 +1,13 @@
+{
+  "originalTrackCoverageRatio": 0.125,
+  "mergedTrackIds": [
+    "track-8",
+    "track-1"
+  ],
+  "mergedCoverageRatio": 0.506,
+  "confirmedDurationMs": 4000,
+  "lostDurationMs": 20000,
+  "remainingLostIntervals": [],
+  "candidateEvaluations": [],
+  "rankedCandidates": []
+}

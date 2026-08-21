@@ -20,6 +20,30 @@ export interface VideoGeometry {
   isMirrored: boolean;
 }
 
+export interface VideoProbeLog {
+  coded_width: number;
+  coded_height: number;
+  display_width: number;
+  display_height: number;
+  display_aspect_ratio: number;
+  rotation_degrees: number;
+  is_mirrored: boolean;
+  autorotation_expected: boolean;
+}
+
+export function formatVideoProbeLog(geometry: VideoGeometry): VideoProbeLog {
+  return {
+    coded_width: geometry.storedWidth,
+    coded_height: geometry.storedHeight,
+    display_width: geometry.displayWidth,
+    display_height: geometry.displayHeight,
+    display_aspect_ratio: geometry.displayWidth / Math.max(1, geometry.displayHeight),
+    rotation_degrees: geometry.rotation,
+    is_mirrored: geometry.isMirrored,
+    autorotation_expected: geometry.rotation !== 0,
+  };
+}
+
 function parseRotation(stderr: string): VideoRotation {
   const displayMatrix = stderr.match(/rotation of (-?\d+(?:\.\d+)?)\s*degrees/i);
   if (displayMatrix) {

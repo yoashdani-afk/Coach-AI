@@ -29,7 +29,7 @@ export interface PlayerSelection {
   identityProfile?: PlayerIdentityProfile;
 }
 
-export type TrackingState = 'CONFIRMED' | 'PROBABLE' | 'LOST';
+export type TrackingState = 'CONFIRMED' | 'PROBABLE' | 'SEARCHING' | 'LOST';
 
 export interface TrackingBoundingBox {
   x: number;
@@ -38,11 +38,15 @@ export interface TrackingBoundingBox {
   height: number;
 }
 
+export type CoordinateSource = 'detection' | 'prediction' | 'interpolated';
+
 export interface TrackingKeyframe {
   timestampMs: number;
   state: TrackingState;
   confidence: number;
   box: TrackingBoundingBox;
+  trackId?: string;
+  coordinateSource?: CoordinateSource;
 }
 
 export interface TrackingCorrection {
@@ -64,6 +68,21 @@ export interface PlayerTrackingData {
   previewAccepted: boolean;
   skipTrackingAfterMs?: number;
   identityConfidence?: IdentityConfidenceLevel;
+  /** Original video dimensions used for normalized coordinates. */
+  sourceWidth?: number;
+  sourceHeight?: number;
+  /** Sampling rate of the tracking timeline (~12 FPS). */
+  fps?: number;
+  selectedTrackId?: string | null;
+  /** False when CV pipeline could not reliably follow the selected player. */
+  reliable?: boolean;
+  /** Fraction of clip duration with confirmed player visibility (0–1). */
+  confirmedCoverageRatio?: number;
+  /** @deprecated Use confirmedCoverageRatio. */
+  coverageRatio?: number;
+  failureMessage?: string;
+  /** When set, partial rebuild keeps keyframes before this timestamp. */
+  rebuildFromMs?: number;
 }
 
 export interface AnalysisTrackingMetadataLog {
@@ -105,6 +124,7 @@ export interface AnalysisScore {
 }
 
 export interface AnalysisResponse {
+  status?: 'success';
   title: string;
   summary: string;
   whatHappened: string;
@@ -116,4 +136,27 @@ export interface AnalysisResponse {
   improvements: string[];
   scores: AnalysisScore[];
   awards: string[];
+  requestId?: string;
+}
+
+export interface InsufficientEvidenceResponse {
+  status: 'insufficient_evidence';
+  message: string;
+  scores: null;
+  overallScore: null;
+  report: null;
+  requestId: string;
+  reason?: string;
+}
+
+export type AnalyseVideoApiResponse = AnalysisResponse | InsufficientEvidenceResponse;
+
+export function isInsufficientEvidenceResponse(
+  value: unknown
+): value is InsufficientEvidenceResponse {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    (value as InsufficientEvidenceResponse).status === 'insufficient_evidence'
+  );
 }

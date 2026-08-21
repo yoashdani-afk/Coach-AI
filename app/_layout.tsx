@@ -24,7 +24,7 @@ function useProtectedRoute() {
 
     if (isDevPreviewMode) {
       if (!hasCompleteProfile(profile) && segments[0] === '(tabs)') {
-        router.replace('/(onboarding)/setup');
+        router.replace('/(onboarding)/setup?edit=1');
       }
       return;
     }
@@ -36,7 +36,7 @@ function useProtectedRoute() {
     if (!session && !inAuthGroup) {
       router.replace('/(onboarding)/welcome');
     } else if (session && inAuthGroup && segments.at(1) !== 'setup') {
-      router.replace(hasCompleteProfile(profile) ? '/(tabs)' : '/(onboarding)/setup');
+      router.replace(hasCompleteProfile(profile) ? '/(tabs)' : '/(onboarding)/setup?edit=1');
     }
   }, [session, isLoading, segments, router, profile, hasHydrated]);
 }
@@ -99,6 +99,9 @@ export default function RootLayout() {
           <Stack.Screen name="hall-of-fame/index" />
           <Stack.Screen name="report/[id]" />
           <Stack.Screen name="reports/history" />
+          <Stack.Screen name="improve/[categoryId]/index" />
+          <Stack.Screen name="improve/[categoryId]/[skillId]/index" />
+          <Stack.Screen name="improve/[categoryId]/[skillId]/[drillId]" />
           <Stack.Screen name="debug" options={{ presentation: 'modal' }} />
           <Stack.Screen name="+not-found" />
         </Stack>
