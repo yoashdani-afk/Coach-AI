@@ -99,8 +99,15 @@ export default function RootLayout() {
           <Stack.Screen name="hall-of-fame/index" />
           <Stack.Screen name="report/[id]" />
           <Stack.Screen name="reports/history" />
+          <Stack.Screen name="improve/session/index" />
+          <Stack.Screen name="improve/session/result" />
           <Stack.Screen name="improve/[categoryId]/index" />
           <Stack.Screen name="improve/[categoryId]/[skillId]/index" />
+          <Stack.Screen name="improve/[categoryId]/[skillId]/muscle/[muscleGroupId]" />
+          <Stack.Screen name="improve/[categoryId]/[skillId]/focus/[speedFocusId]" />
+          <Stack.Screen name="improve/[categoryId]/[skillId]/agility-focus/[agilityFocusId]" />
+          <Stack.Screen name="improve/[categoryId]/[skillId]/recovery-focus/[recoveryFocusId]" />
+          <Stack.Screen name="improve/[categoryId]/[skillId]/tier/[tierId]" />
           <Stack.Screen name="improve/[categoryId]/[skillId]/[drillId]" />
           <Stack.Screen name="debug" options={{ presentation: 'modal' }} />
           <Stack.Screen name="+not-found" />

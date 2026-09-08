@@ -2,10 +2,27 @@ import { ScrollView, View, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
+import { ImproveAgilityFocusGrid } from '@/components/improve/ImproveAgilityFocusGrid';
+import { ImproveDifficultyTierGrid } from '@/components/improve/ImproveDifficultyTierGrid';
 import { ImproveDrillList } from '@/components/improve/ImproveDrillList';
-import { ImproveSkillProgressBadge } from '@/components/improve/ImproveSkillProgressBadge';
+import { ImproveMuscleGroupGrid } from '@/components/improve/ImproveMuscleGroupGrid';
+import { ImproveRecoveryFocusGrid } from '@/components/improve/ImproveRecoveryFocusGrid';
+import { ImproveSpeedFocusGrid } from '@/components/improve/ImproveSpeedFocusGrid';
 import { Button, Card } from '@/components/ui';
-import { getImproveCategory, getImproveSkill } from '@/lib/improveContent';
+import {
+  getImproveCategory,
+  getImproveSkill,
+  listAgilityFocusAreasForSkill,
+  listDifficultyTiersForSkill,
+  listMuscleGroupsForSkill,
+  listRecoveryFocusAreasForSkill,
+  listSpeedFocusAreasForSkill,
+  skillHasAgilityFocus,
+  skillHasMuscleGroups,
+  skillHasRecoveryFocus,
+  skillHasSpeedFocus,
+  skillUsesDifficultyTiers,
+} from '@/lib/improveContent';
 
 export default function ImproveSkillDetailScreen() {
   const router = useRouter();
@@ -13,6 +30,31 @@ export default function ImproveSkillDetailScreen() {
   const { categoryId, skillId } = useLocalSearchParams<{ categoryId: string; skillId: string }>();
   const category = categoryId ? getImproveCategory(categoryId) : undefined;
   const skill = categoryId && skillId ? getImproveSkill(categoryId, skillId) : undefined;
+  const showRecoveryFocus = skill ? skillHasRecoveryFocus(skill) : false;
+  const showMuscleGroups =
+    skill && !showRecoveryFocus ? skillHasMuscleGroups(skill) : false;
+  const showSpeedFocus =
+    skill && !showRecoveryFocus && !showMuscleGroups ? skillHasSpeedFocus(skill) : false;
+  const showAgilityFocus =
+    skill && !showRecoveryFocus && !showMuscleGroups && !showSpeedFocus
+      ? skillHasAgilityFocus(skill)
+      : false;
+  const showDifficultyTiers =
+    skill &&
+    !showRecoveryFocus &&
+    !showMuscleGroups &&
+    !showSpeedFocus &&
+    !showAgilityFocus
+      ? skillUsesDifficultyTiers(skill)
+      : false;
+  const muscleGroups = skill && showMuscleGroups ? listMuscleGroupsForSkill(skill) : [];
+  const speedFocusAreas = skill && showSpeedFocus ? listSpeedFocusAreasForSkill(skill) : [];
+  const agilityFocusAreas =
+    skill && showAgilityFocus ? listAgilityFocusAreasForSkill(skill) : [];
+  const recoveryFocusAreas =
+    skill && showRecoveryFocus ? listRecoveryFocusAreasForSkill(skill) : [];
+  const difficultyTiers =
+    skill && showDifficultyTiers ? listDifficultyTiersForSkill(skill) : [];
 
   if (!category || !skill) {
     return (
@@ -27,6 +69,14 @@ export default function ImproveSkillDetailScreen() {
       </View>
     );
   }
+
+  const sectionLabel = showMuscleGroups
+    ? 'Choose a muscle group'
+    : showSpeedFocus || showAgilityFocus || showRecoveryFocus
+      ? 'Choose a focus'
+      : showDifficultyTiers
+        ? 'Choose a difficulty'
+        : 'Drills to try';
 
   return (
     <View className="flex-1 bg-background">
@@ -45,8 +95,6 @@ export default function ImproveSkillDetailScreen() {
           <Text className="text-text-secondary text-sm leading-6">{skill.summary}</Text>
         ) : null}
 
-        <ImproveSkillProgressBadge categoryId={category.id} skillId={skill.id} showBar />
-
         <View>
           <Text className="text-text-muted text-xs uppercase tracking-wider mb-2">About this skill</Text>
           <Card variant="outlined">
@@ -59,8 +107,40 @@ export default function ImproveSkillDetailScreen() {
         </View>
 
         <View>
-          <Text className="text-text-muted text-xs uppercase tracking-wider mb-2">Drills to try</Text>
-          <ImproveDrillList categoryId={category.id} skillId={skill.id} drills={skill.drills} />
+          <Text className="text-text-muted text-xs uppercase tracking-wider mb-2">{sectionLabel}</Text>
+          {showMuscleGroups ? (
+            <ImproveMuscleGroupGrid
+              categoryId={category.id}
+              skillId={skill.id}
+              muscleGroups={muscleGroups}
+            />
+          ) : showSpeedFocus ? (
+            <ImproveSpeedFocusGrid
+              categoryId={category.id}
+              skillId={skill.id}
+              focusAreas={speedFocusAreas}
+            />
+          ) : showAgilityFocus ? (
+            <ImproveAgilityFocusGrid
+              categoryId={category.id}
+              skillId={skill.id}
+              focusAreas={agilityFocusAreas}
+            />
+          ) : showRecoveryFocus ? (
+            <ImproveRecoveryFocusGrid
+              categoryId={category.id}
+              skillId={skill.id}
+              focusAreas={recoveryFocusAreas}
+            />
+          ) : showDifficultyTiers ? (
+            <ImproveDifficultyTierGrid
+              categoryId={category.id}
+              skillId={skill.id}
+              tiers={difficultyTiers}
+            />
+          ) : (
+            <ImproveDrillList categoryId={category.id} skillId={skill.id} drills={skill.drills} />
+          )}
         </View>
       </ScrollView>
     </View>

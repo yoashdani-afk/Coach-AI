@@ -1,15 +1,13 @@
 import { mapResponseToReport } from '@/analysis/mapResponseToReport';
 import type { AnalysisRequestPayload } from '@/analysis/models/AnalysisRequest';
-import { DemoProvider } from '@/analysis/providers/DemoProvider';
 import { GeminiProvider } from '@/analysis/providers/GeminiProvider';
-import { isAnalysisApiConfigured } from '@/lib/analysisConfig';
+import { isAnalysisApiConfigured, logAnalysisApiTarget } from '@/lib/analysisConfig';
 import {
   classifyAnalysisError,
   formatFallbackReason,
   isPlayerGroundingFailure,
   type AnalysisFailureCategory,
 } from '@/lib/analysisErrors';
-import { logAnalysisApiTarget } from '@/lib/analysisConfig';
 import type { CoachingReport, ReportAnalysisSource } from '@/types/analysis';
 import { isInsufficientEvidenceResponse } from '@/analysis/models/AnalysisResponse';
 
@@ -18,9 +16,7 @@ export type AnalysisSource = ReportAnalysisSource;
 export interface AnalysisSuccessResult {
   outcome: 'report';
   report: CoachingReport;
-  source: AnalysisSource;
-  /** Set when source is demo — explains why Gemini was not used. */
-  fallbackReason?: string;
+  source: 'gemini';
 }
 
 export interface AnalysisInsufficientEvidenceResult {
@@ -30,38 +26,38 @@ export interface AnalysisInsufficientEvidenceResult {
   source: 'gemini';
 }
 
-export type AnalysisRunResult = AnalysisSuccessResult | AnalysisInsufficientEvidenceResult;
+export interface AnalysisFailedResult {
+  outcome: 'failed';
+  message: string;
+  category: AnalysisFailureCategory;
+}
 
-function tagDemoReport(
-  report: CoachingReport,
-  category: AnalysisFailureCategory,
-  detail?: string
-): CoachingReport {
-  return {
-    ...report,
-    analysisSource: 'demo',
-    analysisFallbackReason: formatFallbackReason(category, detail),
-  };
+export type AnalysisRunResult =
+  | AnalysisSuccessResult
+  | AnalysisInsufficientEvidenceResult
+  | AnalysisFailedResult;
+
+function userFacingFailureMessage(category: AnalysisFailureCategory, detail?: string): string {
+  const reason = formatFallbackReason(category, detail);
+  return `Analysis failed — please try again.\n\n${reason}`;
 }
 
 /**
- * Runs video analysis through the configured provider chain.
+ * Runs video analysis through the Gemini provider.
  *
- * 1. If EXPO_PUBLIC_ANALYSIS_API_URL is set, POST the clip to the server (Gemini).
- * 2. On any failure, fall back to the local DemoProvider.
+ * Failures (including missing API URL) return outcome: 'failed' — never a silent demo report.
+ * Player grounding failures still throw for specialised UI handling.
  */
 export async function runAnalysis(
   request: AnalysisRequestPayload
 ): Promise<AnalysisRunResult> {
   if (!isAnalysisApiConfigured) {
     const category: AnalysisFailureCategory = 'API URL not configured';
-    console.log('[Analysis] Provider: Demo');
-    console.log('[Analysis] Reason for fallback:', category);
+    console.log('[Analysis] API URL not configured — failing without demo report');
     return {
-      outcome: 'report',
-      report: tagDemoReport(DemoProvider.analyse(request), category),
-      source: 'demo',
-      fallbackReason: category,
+      outcome: 'failed',
+      message: userFacingFailureMessage(category),
+      category,
     };
   }
 
@@ -98,18 +94,15 @@ export async function runAnalysis(
     const category = classifyAnalysisError(error);
     const detail = error instanceof Error ? error.message : String(error);
 
-    console.log('[Analysis] Provider: Demo');
-    console.log('[Analysis] Reason for fallback:', formatFallbackReason(category, detail));
-
-    if (__DEV__) {
-      console.warn('[Analysis] Gemini failed — using demo feedback:', detail);
-    }
+    console.log('[Analysis] Gemini failed — surfacing error (no demo fallback):', {
+      category,
+      detail,
+    });
 
     return {
-      outcome: 'report',
-      report: tagDemoReport(DemoProvider.analyse(request), category, detail),
-      source: 'demo',
-      fallbackReason: formatFallbackReason(category, detail),
+      outcome: 'failed',
+      message: userFacingFailureMessage(category, detail),
+      category,
     };
   }
 }

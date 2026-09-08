@@ -142,7 +142,7 @@ export const ANALYSIS_MODES: {
   },
   {
     mode: 'PERFORMANCE',
-    label: 'Rate My Performance',
+    label: 'Analyze my performance',
     emoji: '⭐',
     description: 'Receive an overall coaching assessment of this clip.',
     examples: [

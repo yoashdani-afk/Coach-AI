@@ -1,19 +1,12 @@
-import { ScrollView, View, Text, Pressable, Linking } from 'react-native';
+import { ScrollView, View, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
-import { ImproveSkillProgressBadge } from '@/components/improve/ImproveSkillProgressBadge';
+import { ImproveDrillVideoPlayer } from '@/components/improve/ImproveDrillVideoPlayer';
 import { Button, Card, Chip } from '@/components/ui';
 import { getImproveCategory, getImproveDrill, getImproveSkill } from '@/lib/improveContent';
-import { labelForPartnerRequirement, buildDrillVideoUrl } from '@/lib/improveDrillDisplay';
-import { useImproveProgressStore } from '@/stores/improveProgressStore';
-
-function openDrillVideo(videoUrl: string, videoTimestampSeconds?: number) {
-  Linking.openURL(buildDrillVideoUrl(videoUrl, videoTimestampSeconds)).catch(() => {
-    // User cancelled or URL could not be opened — no-op.
-  });
-}
+import { labelForPartnerRequirement, formatDrillDifficultyStars } from '@/lib/improveDrillDisplay';
 
 export default function ImproveDrillDetailScreen() {
   const router = useRouter();
@@ -23,7 +16,6 @@ export default function ImproveDrillDetailScreen() {
     skillId: string;
     drillId: string;
   }>();
-  const markDrillDone = useImproveProgressStore((state) => state.markDrillDone);
 
   const category = categoryId ? getImproveCategory(categoryId) : undefined;
   const skill = categoryId && skillId ? getImproveSkill(categoryId, skillId) : undefined;
@@ -59,28 +51,12 @@ export default function ImproveDrillDetailScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24, gap: 16 }}
         showsVerticalScrollIndicator={false}
       >
-        <ImproveSkillProgressBadge categoryId={category.id} skillId={skill.id} showBar />
-
         {drill.videoUrl ? (
-          <View>
-            <Text className="text-text-muted text-xs uppercase tracking-wider mb-2">Watch demo</Text>
-            <Pressable
-              onPress={() => openDrillVideo(drill.videoUrl!, drill.videoTimestampSeconds)}
-              className="active:opacity-80"
-            >
-              <Card variant="outlined" className="flex-row items-center justify-between gap-3">
-                <View className="flex-row items-center gap-3 flex-1">
-                  <View className="w-10 h-10 rounded-xl bg-primary-muted items-center justify-center">
-                    <Ionicons name="play" size={20} color="#00C853" />
-                  </View>
-                  <Text className="text-text-primary font-semibold text-base">Open video</Text>
-                </View>
-                {drill.videoTimestamp ? (
-                  <Text className="text-text-muted text-sm">Skip to {drill.videoTimestamp}</Text>
-                ) : null}
-              </Card>
-            </Pressable>
-          </View>
+          <ImproveDrillVideoPlayer
+            videoUrl={drill.videoUrl}
+            videoTimestamp={drill.videoTimestamp}
+            videoTimestampSeconds={drill.videoTimestampSeconds}
+          />
         ) : null}
 
         <View>
@@ -89,9 +65,21 @@ export default function ImproveDrillDetailScreen() {
               <Text className="text-text-muted text-sm">Duration</Text>
               <Text className="text-text-primary text-sm font-medium">{drill.duration}</Text>
             </View>
-            <View className="flex-row justify-between items-center px-4 py-3">
+            <View className="flex-row justify-between items-center px-4 py-3 border-b border-border">
               <Text className="text-text-muted text-sm">Players needed</Text>
               <Chip label={partnerLabel} selected />
+            </View>
+            <View className="flex-row justify-between items-center px-4 py-3 border-b border-border">
+              <Text className="text-text-muted text-sm">Difficulty</Text>
+              <Text className="text-primary text-sm font-medium">
+                {formatDrillDifficultyStars(drill.difficulty)}
+              </Text>
+            </View>
+            <View className="flex-row justify-between items-center px-4 py-3">
+              <Text className="text-text-muted text-sm">Creator</Text>
+              <Text className="text-text-primary text-sm font-medium text-right flex-1 ml-4">
+                {drill.creator}
+              </Text>
             </View>
           </Card>
         </View>
@@ -153,13 +141,6 @@ export default function ImproveDrillDetailScreen() {
             </Card>
           </View>
         ) : null}
-
-        <Button
-          label="Mark as done"
-          variant="secondary"
-          fullWidth
-          onPress={() => markDrillDone(category.id, skill.id)}
-        />
       </ScrollView>
     </View>
   );

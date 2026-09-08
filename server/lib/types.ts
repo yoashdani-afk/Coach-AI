@@ -137,6 +137,10 @@ export interface AnalysisResponse {
   scores: AnalysisScore[];
   awards: string[];
   requestId?: string;
+  /** Performance mode only — null when no clear single weakness. */
+  primaryImprovementArea?: string | null;
+  /** Performance mode only — null when area is null. */
+  primaryImprovementReasoning?: string | null;
 }
 
 export interface InsufficientEvidenceResponse {

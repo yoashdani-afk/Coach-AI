@@ -1,6 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { createAppJSONStorage } from '@/lib/appStorage';
 
 interface AnalysisCreditsState {
   consumedAttemptIds: string[];
@@ -36,13 +36,17 @@ export const useAnalysisCreditsStore = create<AnalysisCreditsState>()(
     }),
     {
       name: 'coach-ai-analysis-credits',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createAppJSONStorage(),
       partialize: (state) => ({
         consumedAttemptIds: state.consumedAttemptIds,
         devCreditsMigrationDone: state.devCreditsMigrationDone,
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+      onRehydrateStorage: () => (state, error) => {
+        if (typeof window === 'undefined') return;
+        if (error) {
+          console.warn('[analysisCreditsStore] rehydration failed', error);
+        }
+        useAnalysisCreditsStore.setState({ hasHydrated: true });
       },
     }
   )

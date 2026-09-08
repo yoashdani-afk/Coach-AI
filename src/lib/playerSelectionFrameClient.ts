@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import {
   ANALYSIS_API_URL,
   analysisEndpoint,
@@ -91,11 +92,21 @@ export async function requestPlayerSelectionFrame(params: {
       },
     })
   );
-  formData.append('video', {
-    uri: params.videoUri,
-    name: inferFileName(params.fileName),
-    type: inferMimeType(params.fileName),
-  } as unknown as Blob);
+  if (Platform.OS === 'web') {
+    // Browser FormData requires a real Blob/File — RN's { uri, name, type } descriptor is ignored.
+    const videoRes = await fetch(params.videoUri, { signal: params.signal });
+    if (!videoRes.ok) {
+      throw new Error(`Could not read video for frame upload (${videoRes.status})`);
+    }
+    const videoBlob = await videoRes.blob();
+    formData.append('video', videoBlob, inferFileName(params.fileName));
+  } else {
+    formData.append('video', {
+      uri: params.videoUri,
+      name: inferFileName(params.fileName),
+      type: inferMimeType(params.fileName),
+    } as unknown as Blob);
+  }
 
   let res: Response;
   try {

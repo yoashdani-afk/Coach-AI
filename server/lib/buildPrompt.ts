@@ -15,6 +15,50 @@ const PERFORMANCE_SCORE_LABELS = [
   'Communication',
 ];
 
+/** Allowed values for Performance-only primaryImprovementArea (or null). */
+export const PERFORMANCE_PRIMARY_IMPROVEMENT_AREAS = [
+  'Decision Making',
+  'Positioning',
+  'Scanning',
+  'Movement',
+  'First Touch',
+  'Composure',
+  'Communication',
+] as const;
+
+export type PerformancePrimaryImprovementArea =
+  (typeof PERFORMANCE_PRIMARY_IMPROVEMENT_AREAS)[number];
+
+/** Parse Performance-only primary improvement fields; invalid/missing → null (never throws). */
+export function parsePerformancePrimaryImprovement(obj: Record<string, unknown>): {
+  primaryImprovementArea: PerformancePrimaryImprovementArea | null;
+  primaryImprovementReasoning: string | null;
+} {
+  const rawArea = obj.primaryImprovementArea;
+  let primaryImprovementArea: PerformancePrimaryImprovementArea | null = null;
+
+  if (typeof rawArea === 'string') {
+    const trimmed = rawArea.trim();
+    if (
+      trimmed.length > 0 &&
+      trimmed.toLowerCase() !== 'null' &&
+      (PERFORMANCE_PRIMARY_IMPROVEMENT_AREAS as readonly string[]).includes(trimmed)
+    ) {
+      primaryImprovementArea = trimmed as PerformancePrimaryImprovementArea;
+    }
+  }
+
+  let primaryImprovementReasoning: string | null = null;
+  if (primaryImprovementArea != null) {
+    const rawReason = obj.primaryImprovementReasoning;
+    if (typeof rawReason === 'string' && rawReason.trim().length > 0) {
+      primaryImprovementReasoning = rawReason.trim();
+    }
+  }
+
+  return { primaryImprovementArea, primaryImprovementReasoning };
+}
+
 const GOAL_SCORE_LABELS = [
   'Finish',
   'Technique',
@@ -77,7 +121,13 @@ function modeTaskInstructions(mode: AnalysisRequestMetadata['mode']): string {
     case 'COACH_ME':
       return `TASK: After timelines and identity verification, answer the coaching question using CONFIRMED selected-player events plus honest team-level context where identity was UNCONFIRMED.`;
     case 'PERFORMANCE':
-      return `TASK: After timelines and identity verification, score performance using only CONFIRMED selected-player actions visible in the clip.`;
+      return `TASK: After timelines and identity verification, score performance using only CONFIRMED selected-player actions visible in the clip.
+
+PRIMARY IMPROVEMENT (PERFORMANCE ONLY — required fields):
+- primaryImprovementArea: exactly one of ${PERFORMANCE_PRIMARY_IMPROVEMENT_AREAS.map((a) => `"${a}"`).join(', ')}, OR null.
+- primaryImprovementReasoning: 1–2 sentences explaining why that area is the priority, OR null.
+- Use null for BOTH fields when performance is strong across the board with no clear single weakness.
+- Do NOT force the lowest-scoring category if there is no meaningful standout weakness.`;
     case 'GOAL':
       return `TASK: After timelines and identity verification, analyse the goal sequence and the selected player's CONFIRMED role.`;
   }
@@ -198,6 +248,13 @@ Use "uncertain" when involvement was not visually confirmed.`;
 
   const goalBlock = metadata.mode === 'GOAL' ? goalModeBlock() : '';
 
+  const performanceImprovementSchema =
+    metadata.mode === 'PERFORMANCE'
+      ? `,
+  "primaryImprovementArea": "Decision Making|Positioning|Scanning|Movement|First Touch|Composure|Communication|null",
+  "primaryImprovementReasoning": "string|null"`
+      : '';
+
   return `${modeTaskInstructions(metadata.mode)}
 
 PLAYER: ${profile.firstName}, ${profile.age}, ${profile.mainPosition}, ${profile.playingLevel}
@@ -289,7 +346,7 @@ Return JSON (identity → timelines → attribution → coaching):
   "strengths": ["string"],
   "improvements": ["string"],
   "scores": [{ "label": "string", "value": 0 }],
-  "awards": ["string"]
+  "awards": ["string"]${performanceImprovementSchema}
 }`;
 }
 

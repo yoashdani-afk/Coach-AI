@@ -5,6 +5,7 @@ import { callGeminiJson } from './geminiJsonCall.js';
 import { extractJsonText } from './parseResponse.js';
 import { ServerAnalysisError } from './analysisErrors.js';
 import { calibrateScores } from './scoreCalibration.js';
+import { parsePerformancePrimaryImprovement } from './buildPrompt.js';
 
 function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value.trim() : fallback;
@@ -84,6 +85,21 @@ function buildCoachingUserPrompt(
         ? 'SCORES: Decision Making, Positioning, Scanning, Movement, First Touch, Composure, Communication — only for CONFIRMED actions.'
         : 'SCORES: [] for COACH_ME.';
 
+  const performanceImprovementBlock =
+    mode === 'PERFORMANCE'
+      ? `PRIMARY IMPROVEMENT (required):
+- primaryImprovementArea: one of "Decision Making"|"Positioning"|"Scanning"|"Movement"|"First Touch"|"Composure"|"Communication", OR null
+- primaryImprovementReasoning: 1–2 sentences, OR null
+- Use null for both when there is no clear single weakness — do not force the lowest score.`
+      : '';
+
+  const performanceImprovementSchema =
+    mode === 'PERFORMANCE'
+      ? `,
+  "primaryImprovementArea": "Decision Making|Positioning|Scanning|Movement|First Touch|Composure|Communication|null",
+  "primaryImprovementReasoning": "string|null"`
+      : '';
+
   return `${goalModeRules(factual)}
 
 PLAYER: ${profile.firstName}, ${profile.age}, ${profile.mainPosition}, ${profile.playingLevel}
@@ -107,6 +123,8 @@ ${questionBlock}
 
 ${scoresBlock}
 
+${performanceImprovementBlock}
+
 ${extraInstruction}
 
 Return JSON:
@@ -121,7 +139,7 @@ Return JSON:
   "strengths": ["string"],
   "improvements": ["string"],
   "scores": [{ "label": "string", "value": 0 }],
-  "awards": ["string"]
+  "awards": ["string"]${performanceImprovementSchema}
 }`;
 }
 
@@ -187,6 +205,7 @@ export function parseCoachingFromTimelineJson(
     improvements,
     scores,
     awards: asStringArray(obj.awards),
+    ...(metadata.mode === 'PERFORMANCE' ? parsePerformancePrimaryImprovement(obj) : {}),
   };
 }
 

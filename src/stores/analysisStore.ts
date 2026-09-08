@@ -1,6 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { createAppJSONStorage } from '@/lib/appStorage';
 import type { AnalysisMode, CoachingReport } from '@/types/analysis';
 
 interface AnalysisState {
@@ -46,13 +46,17 @@ export const useAnalysisStore = create<AnalysisState>()(
     }),
     {
       name: 'coach-ai-reports',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createAppJSONStorage(),
       partialize: (state) => ({ reports: state.reports }),
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
+        if (typeof window === 'undefined') return;
+        if (error) {
+          console.warn('[analysisStore] rehydration failed', error);
+        }
         if (state) {
           state.reports = state.reports.filter(isValidReport);
         }
-        state?.setHasHydrated(true);
+        useAnalysisStore.setState({ hasHydrated: true });
       },
     }
   )

@@ -1,9 +1,9 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
 import type { PlayerProfile } from '@/types/profile';
 import { FREE_TIER_ANALYSES_PER_MONTH } from '@/lib/constants';
 import { isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
+import { createAppJSONStorage } from '@/lib/appStorage';
 import { useAnalysisCreditsStore } from '@/stores/analysisCreditsStore';
 import { migrateStoredProfile } from '@/lib/profileUtils';
 
@@ -99,13 +99,17 @@ export const useProfileStore = create<ProfileState>()(
     }),
     {
       name: 'coach-ai-profile',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createAppJSONStorage(),
       partialize: (state) => ({
         hasSeenOnboarding: state.hasSeenOnboarding,
         isSignedIn: state.isSignedIn,
         profile: state.profile,
       }),
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
+        if (typeof window === 'undefined') return;
+        if (error) {
+          console.warn('[profileStore] rehydration failed', error);
+        }
         if (state?.profile) {
           const migrated = migrateStoredProfile(state.profile);
           if (migrated) {
@@ -114,7 +118,7 @@ export const useProfileStore = create<ProfileState>()(
             state.clearProfile();
           }
         }
-        state?.setHasHydrated(true);
+        useProfileStore.setState({ hasHydrated: true });
       },
     }
   )

@@ -1,6 +1,6 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { createAppJSONStorage } from '@/lib/appStorage';
 import type {
   Challenge,
   GoalSubmission,
@@ -164,13 +164,17 @@ export const useHallOfFameStore = create<HallOfFameState>()(
     }),
     {
       name: 'coach-ai-hall-of-fame',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createAppJSONStorage(),
       partialize: (state) => ({ userSubmissions: state.userSubmissions }),
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
+        if (typeof window === 'undefined') return;
+        if (error) {
+          console.warn('[hallOfFameStore] rehydration failed', error);
+        }
         if (state) {
           state.userSubmissions = state.userSubmissions.filter(isValidSubmission);
         }
-        state?.setHasHydrated(true);
+        useHallOfFameStore.setState({ hasHydrated: true });
       },
     }
   )

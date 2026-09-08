@@ -7,6 +7,7 @@ import {
   LayoutChangeEvent,
   GestureResponderEvent,
   Image,
+  Platform,
   type ImageStyle,
 } from 'react-native';
 import { PlayerMarkerOverlay } from '@/components/analysis/PlayerSelectionMarker';
@@ -146,6 +147,7 @@ export function PlayerSelectionFrame({
   );
   const loadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeFrameRequest = useRef(0);
+  const lastWebTapAtRef = useRef(0);
 
   const clearLoadTimeout = useCallback(() => {
     if (loadTimeoutRef.current) {
@@ -344,21 +346,76 @@ export function PlayerSelectionFrame({
     setCardWidth(event.nativeEvent.layout.width);
   };
 
+  const applyTapAt = useCallback(
+    (locationX: number, locationY: number) => {
+      if (loadState !== 'ready' || frameLoading || !selectionFrame || thumbnailRect.width <= 0) {
+        return;
+      }
+
+      // Web: onPress + onClick can both fire for one mouse click — keep a single apply.
+      if (Platform.OS === 'web') {
+        const now = Date.now();
+        if (now - lastWebTapAtRef.current < 50) return;
+        lastWebTapAtRef.current = now;
+      }
+
+      const next = {
+        x: clamp01(locationX / thumbnailRect.width),
+        y: clamp01(locationY / thumbnailRect.height),
+      };
+
+      setNormalized(next);
+      setMarkerTimestampMs(selectionFrame.timestampMs);
+      setReducedTrackingConfidence(false);
+      emitSelection(next, selectionFrame.timestampMs, false);
+    },
+    [loadState, frameLoading, selectionFrame, thumbnailRect.width, thumbnailRect.height, emitSelection]
+  );
+
+  const resolveWebTapLocation = (
+    event: { clientX?: number; clientY?: number; currentTarget?: unknown; nativeEvent?: { clientX?: number; clientY?: number } }
+  ): { locationX: number; locationY: number } | null => {
+    const clientX = event.clientX ?? event.nativeEvent?.clientX;
+    const clientY = event.clientY ?? event.nativeEvent?.clientY;
+    const target = event.currentTarget as { getBoundingClientRect?: () => DOMRect } | null | undefined;
+    const rect = target?.getBoundingClientRect?.();
+    if (rect == null || clientX == null || clientY == null) return null;
+    return {
+      locationX: clientX - rect.left,
+      locationY: clientY - rect.top,
+    };
+  };
+
   const handleTap = (event: GestureResponderEvent) => {
     if (loadState !== 'ready' || frameLoading || !selectionFrame || thumbnailRect.width <= 0) {
       return;
     }
 
-    const { locationX, locationY } = event.nativeEvent;
-    const next = {
-      x: clamp01(locationX / thumbnailRect.width),
-      y: clamp01(locationY / thumbnailRect.height),
-    };
+    if (Platform.OS === 'web') {
+      const webLocation = resolveWebTapLocation({
+        currentTarget: event.currentTarget,
+        nativeEvent: event.nativeEvent as { clientX?: number; clientY?: number },
+      });
+      if (!webLocation) return;
+      applyTapAt(webLocation.locationX, webLocation.locationY);
+      return;
+    }
 
-    setNormalized(next);
-    setMarkerTimestampMs(selectionFrame.timestampMs);
-    setReducedTrackingConfidence(false);
-    emitSelection(next, selectionFrame.timestampMs, false);
+    const { locationX, locationY } = event.nativeEvent;
+    applyTapAt(locationX, locationY);
+  };
+
+  /** Web-only: DOM click is more reliable for re-taps than Pressable onPress alone. */
+  const handleWebClick = (event: {
+    clientX: number;
+    clientY: number;
+    currentTarget: EventTarget;
+    preventDefault?: () => void;
+  }) => {
+    if (Platform.OS !== 'web') return;
+    const webLocation = resolveWebTapLocation(event);
+    if (!webLocation) return;
+    applyTapAt(webLocation.locationX, webLocation.locationY);
   };
 
   const maxDurationMs = clipDurationMs > 0 ? clipDurationMs : 1;
@@ -439,6 +496,9 @@ export function PlayerSelectionFrame({
           {thumbnailRect.width > 0 ? (
             <Pressable
               onPress={handleTap}
+              // @ts-expect-error web-only DOM click fallback for reliable re-taps
+              onClick={Platform.OS === 'web' ? handleWebClick : undefined}
+              pointerEvents={Platform.OS === 'web' ? 'box-only' : undefined}
               style={{
                 position: 'absolute',
                 left: thumbnailRect.x,

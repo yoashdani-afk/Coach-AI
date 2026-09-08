@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import type { AnalysisRequestPayload } from '@/analysis/models/AnalysisRequest';
 import { toRequestMetadata } from '@/analysis/models/AnalysisRequest';
 import {
@@ -34,11 +35,24 @@ export async function analyseWithGemini(
   const formData = new FormData();
 
   formData.append('metadata', JSON.stringify(metadata));
-  formData.append('video', {
-    uri: request.clip.uri,
-    name: request.clip.fileName ?? 'clip.mp4',
-    type: inferMimeType(request.clip.fileName),
-  } as unknown as Blob);
+  if (Platform.OS === 'web') {
+    // Browser FormData requires a real Blob/File — RN's { uri, name, type } descriptor is ignored.
+    const videoRes = await fetch(request.clip.uri);
+    if (!videoRes.ok) {
+      throw new GeminiAnalysisError(
+        'upload failed',
+        `Could not read video for analysis upload (${videoRes.status})`
+      );
+    }
+    const videoBlob = await videoRes.blob();
+    formData.append('video', videoBlob, request.clip.fileName ?? 'clip.mp4');
+  } else {
+    formData.append('video', {
+      uri: request.clip.uri,
+      name: request.clip.fileName ?? 'clip.mp4',
+      type: inferMimeType(request.clip.fileName),
+    } as unknown as Blob);
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);

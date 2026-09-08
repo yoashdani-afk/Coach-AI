@@ -230,6 +230,9 @@ export interface PerformanceReport extends BaseReport {
   biggestImprovement: string;
   coachSummary: string;
   trainingRecommendation: string;
+  /** Gemini primary focus skill label, or null if no clear single weakness. */
+  primaryImprovementArea?: string | null;
+  primaryImprovementReasoning?: string | null;
 }
 
 export interface GoalReport extends BaseReport {

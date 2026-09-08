@@ -1,10 +1,17 @@
 import { ScrollView, View, Text } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CategoryScoreList } from '@/components/analysis/CategoryScoreList';
-import { Card } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
 import { labelForAnalysisMode } from '@/lib/constants';
 import { formatReportDate } from '@/lib/format';
+import {
+  mapPerformanceImprovementToSkill,
+  performanceImprovementSkillHref,
+  performanceImprovementToSessionTarget,
+} from '@/lib/performanceImprovementMapping';
 import { reportSourceLabel, reportOverallScoreLabel, isGeminiAnalysedReport, resolveReportSource } from '@/lib/reportSource';
+import { useImproveSessionDraftStore } from '@/stores/improveSessionDraftStore';
 import type { CoachingReport } from '@/types/analysis';
 
 interface ReportDetailViewProps {
@@ -109,7 +116,29 @@ function PerformanceSections({
 }: {
   report: Extract<CoachingReport, { mode: 'PERFORMANCE' }>;
 }) {
+  const router = useRouter();
+  const resetDraft = useImproveSessionDraftStore((s) => s.resetDraft);
+  const setTarget = useImproveSessionDraftStore((s) => s.setTarget);
   const aiAnalysed = isGeminiAnalysedReport(report);
+
+  const primaryArea = report.primaryImprovementArea ?? null;
+  const primaryReasoning = report.primaryImprovementReasoning ?? null;
+  const mappedSkill = primaryArea ? mapPerformanceImprovementToSkill(primaryArea) : null;
+  const skillHref = primaryArea ? performanceImprovementSkillHref(primaryArea) : null;
+
+  const openSkill = () => {
+    if (!skillHref) return;
+    router.push(skillHref as `/improve/${string}/${string}`);
+  };
+
+  const openSessionWizard = () => {
+    if (!primaryArea) return;
+    const target = performanceImprovementToSessionTarget(primaryArea);
+    if (!target) return;
+    resetDraft();
+    setTarget(target);
+    router.push('/improve/session');
+  };
 
   return (
     <>
@@ -127,6 +156,45 @@ function PerformanceSections({
         <Card variant="outlined" className="bg-primary-muted/20 border-primary/20">
           <Text className="text-text-primary text-base leading-6">{report.topStrength}</Text>
         </Card>
+      </ReportSection>
+
+      <ReportSection title="Focus next">
+        {primaryArea && mappedSkill ? (
+          <Card variant="outlined" className="gap-4">
+            <View className="gap-1">
+              <Text className="text-text-muted text-xs uppercase tracking-wider">
+                Primary improvement area
+              </Text>
+              <Text className="text-text-primary text-lg font-semibold">{primaryArea}</Text>
+            </View>
+            {primaryReasoning ? (
+              <Text className="text-text-secondary text-base leading-6">{primaryReasoning}</Text>
+            ) : null}
+            <View className="gap-3">
+              <Button
+                label={`Open ${primaryArea} drills`}
+                onPress={openSkill}
+                fullWidth
+              />
+              <Button
+                label="Build a session to improve this"
+                variant="secondary"
+                onPress={openSessionWizard}
+                fullWidth
+              />
+            </View>
+          </Card>
+        ) : (
+          <Card variant="outlined" className="bg-primary-muted/20 border-primary/20 gap-2">
+            <Text className="text-text-primary text-base font-semibold leading-6">
+              Strong performance — nothing major to work on right now
+            </Text>
+            <Text className="text-text-secondary text-sm leading-5">
+              Keep training consistently. When a clearer focus area shows up in a future clip, we will
+              suggest drills and a session for it.
+            </Text>
+          </Card>
+        )}
       </ReportSection>
 
       <ReportSection title="Biggest improvement area">

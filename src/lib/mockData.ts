@@ -16,7 +16,7 @@ export const HOW_IT_WORKS = [
   {
     step: '2',
     title: 'Choose a coaching mode',
-    body: 'Coach Me, Rate My Performance, or Rate This Goal — one mode per clip.',
+    body: 'Coach Me, Analyze my performance, or Rate This Goal — one mode per clip.',
   },
   {
     step: '3',

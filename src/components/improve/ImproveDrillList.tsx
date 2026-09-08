@@ -1,8 +1,8 @@
-import { Pressable, View, Text, Linking } from 'react-native';
+import { Pressable, View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '@/components/ui';
-import { formatDrillListSubtitle } from '@/lib/improveDrillDisplay';
+import { formatDrillListMetaLine, formatDrillListSubtitle } from '@/lib/improveDrillDisplay';
 import type { ImproveDrill } from '@/types/improve';
 
 interface ImproveDrillListProps {
@@ -34,6 +34,7 @@ export function ImproveDrillList({ categoryId, skillId, drills }: ImproveDrillLi
             <View className="flex-1 gap-1">
               <Text className="text-text-primary font-semibold text-base">{drill.title}</Text>
               <Text className="text-text-muted text-sm">{formatDrillListSubtitle(drill)}</Text>
+              <Text className="text-text-muted text-xs">{formatDrillListMetaLine(drill)}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#00C853" />
           </Card>

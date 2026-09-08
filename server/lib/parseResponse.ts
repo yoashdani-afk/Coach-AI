@@ -6,6 +6,7 @@ import {
 } from './playerGrounding.js';
 import type { AnalysisResponse, AnalysisScore, AnalysisTrackingMetadataLog } from './types.js';
 import { calibrateScores } from './scoreCalibration.js';
+import { parsePerformancePrimaryImprovement } from './buildPrompt.js';
 import {
   buildUncertainAnalysisResponse,
   validateNarrativeAgainstTimeline,
@@ -696,6 +697,12 @@ export function parseGeminiJson(
     scores: calibratedScoreList,
     awards: asStringArray(obj.awards),
   };
+
+  if (options?.mode === 'PERFORMANCE') {
+    const primary = parsePerformancePrimaryImprovement(obj);
+    response.primaryImprovementArea = primary.primaryImprovementArea;
+    response.primaryImprovementReasoning = primary.primaryImprovementReasoning;
+  }
 
   if (!response.whatHappened || !response.whyItMattered) {
     throw new ServerAnalysisError(

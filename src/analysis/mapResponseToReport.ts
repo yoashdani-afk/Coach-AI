@@ -72,6 +72,8 @@ export function mapResponseToReport(
           .filter(Boolean)
           .join(' '),
         trainingRecommendation: trainingTakeaway,
+        primaryImprovementArea: response.primaryImprovementArea ?? null,
+        primaryImprovementReasoning: response.primaryImprovementReasoning ?? null,
       };
     }
 

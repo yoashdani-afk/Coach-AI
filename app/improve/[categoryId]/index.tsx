@@ -1,10 +1,15 @@
+import { useEffect } from 'react';
 import { ScrollView, View, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { ImproveSkillListItem } from '@/components/improve/ImproveSkillListItem';
 import { Button } from '@/components/ui';
-import { getImproveCategory, listSkillsForCategory } from '@/lib/improveContent';
+import {
+  getImproveCategory,
+  getImproveCategoryRoute,
+  listSkillsForCategory,
+} from '@/lib/improveContent';
 
 export default function ImproveCategoryScreen() {
   const router = useRouter();
@@ -12,6 +17,12 @@ export default function ImproveCategoryScreen() {
   const { categoryId } = useLocalSearchParams<{ categoryId: string }>();
   const category = categoryId ? getImproveCategory(categoryId) : undefined;
   const skills = categoryId ? listSkillsForCategory(categoryId) : [];
+
+  useEffect(() => {
+    if (category && skills.length === 1) {
+      router.replace(getImproveCategoryRoute(category));
+    }
+  }, [category, router, skills.length]);
 
   if (!category) {
     return (
@@ -25,6 +36,10 @@ export default function ImproveCategoryScreen() {
         </View>
       </View>
     );
+  }
+
+  if (skills.length === 1) {
+    return null;
   }
 
   return (
@@ -44,7 +59,6 @@ export default function ImproveCategoryScreen() {
         {skills.map((skill) => (
           <ImproveSkillListItem
             key={skill.id}
-            categoryId={category.id}
             skill={skill}
             onPress={() => router.push(`/improve/${category.id}/${skill.id}`)}
           />

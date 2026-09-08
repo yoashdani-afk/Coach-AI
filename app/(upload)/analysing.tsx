@@ -116,6 +116,8 @@ export default function AnalysingScreen() {
           router.replace({
             pathname: '/(upload)/analysis-failed',
             params: {
+              title: 'Analysis unavailable',
+              subtitle: 'The footage could not be understood confidently enough.',
               message: result.message,
               requestId: result.requestId ?? '',
             },
@@ -123,29 +125,28 @@ export default function AnalysingScreen() {
           return;
         }
 
-        if (__DEV__ && result.source === 'demo' && result.fallbackReason) {
-          Alert.alert(
-            'Gemini analysis unavailable',
-            `Using demo feedback instead.\n\nReason: ${result.fallbackReason}`,
-            [{ text: 'OK' }]
-          );
+        if (result.outcome === 'failed') {
+          setIsAnalysing(false);
+          router.replace({
+            pathname: '/(upload)/analysis-failed',
+            params: {
+              title: 'Analysis failed',
+              subtitle: 'Please try again.',
+              message: result.message,
+            },
+          });
+          return;
         }
 
-        setStatusNote(
-          result.source === 'gemini'
-            ? 'Analysis complete.'
-            : result.fallbackReason ?? 'Using demo feedback.'
-        );
+        setStatusNote('Analysis complete.');
 
         const hallOfFameUnlock = hallOfFameService.evaluateForHallOfFame(result.report);
 
-        if (result.source === 'gemini') {
-          setPendingBillableAnalysis({
-            attemptId,
-            reportId: result.report.id,
-            source: 'gemini',
-          });
-        }
+        setPendingBillableAnalysis({
+          attemptId,
+          reportId: result.report.id,
+          source: 'gemini',
+        });
 
         if (hallOfFameUnlock && profile) {
           addReport(result.report);
@@ -238,7 +239,7 @@ export default function AnalysingScreen() {
           <Text className="text-text-secondary text-sm text-center leading-5">
             {isAnalysisApiConfigured
               ? 'Building your personalised football analysis.'
-              : 'Demo mode — generating feedback locally.'}
+              : 'Analysis server is not configured. Check EXPO_PUBLIC_ANALYSIS_API_URL.'}
           </Text>
         </Card>
       </View>

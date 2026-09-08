@@ -81,7 +81,7 @@ export function generatePerformanceReport(params: {
   return {
     id: createReportId(clip, 'performance'),
     mode: 'PERFORMANCE',
-    title: 'Rate My Performance',
+    title: 'Analyze my performance',
     summary: coachSummary,
     playerSelection,
     categories,

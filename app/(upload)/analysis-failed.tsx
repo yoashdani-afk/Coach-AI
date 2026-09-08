@@ -8,21 +8,29 @@ import { ScreenHeader } from '@/components/layout/ScreenHeader';
 export default function AnalysisFailedScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { message, requestId } = useLocalSearchParams<{
+  const { message, requestId, title, subtitle } = useLocalSearchParams<{
     message?: string;
     requestId?: string;
+    title?: string;
+    subtitle?: string;
   }>();
 
+  const displayTitle =
+    typeof title === 'string' && title.trim().length > 0 ? title : 'Analysis failed';
+  const displaySubtitle =
+    typeof subtitle === 'string' && subtitle.trim().length > 0
+      ? subtitle
+      : 'Something went wrong while analysing your clip.';
   const displayMessage =
     typeof message === 'string' && message.trim().length > 0
       ? message
-      : "We couldn't analyse this clip confidently.";
+      : 'Analysis failed — please try again.';
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title="Analysis unavailable"
-        subtitle="The footage could not be understood confidently enough."
+        title={displayTitle}
+        subtitle={displaySubtitle}
         showBack
         onBack={() => router.back()}
       />
@@ -34,9 +42,7 @@ export default function AnalysisFailedScreen() {
           <View className="w-20 h-20 rounded-2xl bg-surface border border-border items-center justify-center">
             <Ionicons name="alert-circle-outline" size={40} color="#FFB300" />
           </View>
-          <Text className="text-text-primary text-xl font-bold text-center">
-            We couldn&apos;t analyse this clip confidently.
-          </Text>
+          <Text className="text-text-primary text-xl font-bold text-center">{displayTitle}</Text>
           <Text className="text-text-secondary text-sm text-center leading-6 px-2">
             {displayMessage}
           </Text>
