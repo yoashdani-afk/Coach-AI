@@ -10,22 +10,22 @@ export const EXAMPLE_ANALYSIS = {
 export const HOW_IT_WORKS = [
   {
     step: '1',
-    title: 'Select a clip',
-    body: 'Pick 10 seconds to 5 minutes from training or a match.',
+    title: 'Upload your clip',
+    body: 'Choose a clip between 10 seconds and 5 minutes from training or a match.',
   },
   {
     step: '2',
-    title: 'Choose a coaching mode',
-    body: 'Coach Me, Analyze my performance, or Rate This Goal — one mode per clip.',
+    title: 'Pick a coaching mode',
+    body: 'Analyze My Performance, Rate This Goal, or Coach Me — one focus per upload.',
   },
   {
     step: '3',
-    title: 'Identify yourself',
-    body: 'Tap your position in the frame so the coach follows the right player.',
+    title: 'Tag yourself in the frame',
+    body: 'Tap your player so coaching follows you, not a teammate.',
   },
   {
     step: '4',
-    title: 'Get your report',
-    body: 'Review your demo report, save it, and track progress over time.',
+    title: 'Read your report',
+    body: 'Get a scored breakdown you can save and revisit anytime.',
   },
 ] as const;

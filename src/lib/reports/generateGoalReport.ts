@@ -88,6 +88,10 @@ export function generateGoalReport(params: {
     whyScoredThisWay,
     excellentPoint: goalExcellentPoint(seed),
     couldBeBetter: goalImprovementPoint(seed),
+    whatHappened: whyScoredThisWay,
+    whyItMattered: whyScoredThisWay,
+    betterOption: goalImprovementPoint(seed),
+    professionalInsight: goalExcellentPoint(seed),
     ...baseReportFields(clip),
   };
 }

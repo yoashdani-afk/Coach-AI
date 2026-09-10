@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { View, Text } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SessionWizardShell } from '@/components/improve/SessionWizardShell';
 import { SelectCard } from '@/components/profile/SelectCard';
 import { Card, Chip, Input } from '@/components/ui';
@@ -18,6 +18,7 @@ const TOTAL_STEPS = 6;
 
 export default function ImproveSessionWizardScreen() {
   const router = useRouter();
+  const { lockedTarget: lockedTargetParam } = useLocalSearchParams<{ lockedTarget?: string }>();
   const profile = useProfileStore((s) => s.profile);
   const categories = getAllImproveCategories();
 
@@ -31,7 +32,11 @@ export default function ImproveSessionWizardScreen() {
   const generate = useImproveSessionDraftStore((s) => s.generate);
   const resetDraft = useImproveSessionDraftStore((s) => s.resetDraft);
 
-  const [step, setStep] = useState(1);
+  /** Performance Focus-next entry: Target pre-set; skip step 1. Coach-tab flow ignores this. */
+  const targetLocked =
+    lockedTargetParam === '1' && useImproveSessionDraftStore.getState().inputs.target != null;
+
+  const [step, setStep] = useState(() => (targetLocked ? 2 : 1));
   const [ageText, setAgeText] = useState(String(inputs.age ?? profile?.age ?? ''));
 
   const recoveryOverridesTarget =
@@ -69,11 +74,12 @@ export default function ImproveSessionWizardScreen() {
   })();
 
   const applyTarget = (target: SessionTarget) => {
+    if (targetLocked) return;
     setTarget(target);
   };
 
   const goBack = () => {
-    if (step === 1) {
+    if (step === 1 || (targetLocked && step === 2)) {
       router.back();
       return;
     }
@@ -112,7 +118,9 @@ export default function ImproveSessionWizardScreen() {
       case 2:
         return {
           title: 'What’s the situation?',
-          subtitle: 'This shapes which drills are safe and useful today.',
+          subtitle: targetLocked
+            ? 'Target is already set from your performance analysis. Pick today’s situation next.'
+            : 'This shapes which drills are safe and useful today.',
         };
       case 3:
         return {
@@ -152,7 +160,7 @@ export default function ImproveSessionWizardScreen() {
       continueLabel={step === TOTAL_STEPS ? 'Generate session' : 'Continue'}
       continueDisabled={!canContinue}
     >
-      {step === 1 ? (
+      {step === 1 && !targetLocked ? (
         <View className="gap-4">
           <SelectCard
             label="Based on my profile"
@@ -300,8 +308,10 @@ export default function ImproveSessionWizardScreen() {
           <Chip
             label="Start over"
             onPress={() => {
+              const preservedTarget = targetLocked ? inputs.target : null;
               resetDraft();
-              setStep(1);
+              if (preservedTarget) setTarget(preservedTarget);
+              setStep(targetLocked ? 2 : 1);
               setAgeText(String(profile?.age ?? ''));
             }}
           />

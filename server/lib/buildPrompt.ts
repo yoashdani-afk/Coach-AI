@@ -121,26 +121,48 @@ function modeTaskInstructions(mode: AnalysisRequestMetadata['mode']): string {
     case 'COACH_ME':
       return `TASK: After timelines and identity verification, answer the coaching question using CONFIRMED selected-player events plus honest team-level context where identity was UNCONFIRMED.`;
     case 'PERFORMANCE':
-      return `TASK: After timelines and identity verification, score performance using only CONFIRMED selected-player actions visible in the clip.
-
-PRIMARY IMPROVEMENT (PERFORMANCE ONLY — required fields):
-- primaryImprovementArea: exactly one of ${PERFORMANCE_PRIMARY_IMPROVEMENT_AREAS.map((a) => `"${a}"`).join(', ')}, OR null.
-- primaryImprovementReasoning: 1–2 sentences explaining why that area is the priority, OR null.
-- Use null for BOTH fields when performance is strong across the board with no clear single weakness.
-- Do NOT force the lowest-scoring category if there is no meaningful standout weakness.`;
+      // primaryImprovement rules live late (pre-schema) — avoid duplicating null-handling here.
+      return `TASK: After timelines and identity verification, score performance using only CONFIRMED selected-player actions visible in the clip.`;
     case 'GOAL':
       return `TASK: After timelines and identity verification, analyse the goal sequence and the selected player's CONFIRMED role.`;
   }
 }
 
+/** Shared condensed Goal tier anchors (also used by dense coaching path). */
+export function goalScoreCalibrationBlock(): string {
+  return `SCORE CALIBRATION (GOAL MODE — fixed anchor tiers):
+Place overall and category scores in the matching tier (fixed anchors, not a free-floating 1–10):
+- 9.5–10 (World-class): Extremely rare, near-flawless technique (e.g. bicycle, long-range under real pressure).
+- 8–9.4 (Excellent): Clear skill — well-struck first-time, composed 1v1, or strong combination play.
+- 6.5–7.9 (Good/solid): Decent technique, moderate difficulty; fairly standard finish.
+- 5–6.4 (Average): Simple/low-difficulty finish (tap-in, open goal); still a goal, nothing remarkable.
+- Below 5: Rare for a scored goal — heavily fortunate/deflected with essentially no skill.
+
+Also: if improvements[] mentions a category, that category cannot be 10.0; do not score UNCONFIRMED phases.`;
+}
+
 function scoringCalibrationBlock(mode: AnalysisRequestMetadata['mode']): string {
   if (mode === 'COACH_ME') return '';
+
+  if (mode === 'GOAL') {
+    return goalScoreCalibrationBlock();
+  }
 
   return `SCORE CALIBRATION:
 Scale: 1.0–3.9 poor | 4.0–5.9 below average | 6.0–6.9 competent | 7.0–7.9 good | 8.0–8.9 excellent | 9.0+ outstanding (rare)
 - Base scores only on visually confirmed actions.
 - If improvements[] mentions a category, that category cannot be 10.0.
 - If selected-player involvement is UNCONFIRMED, do not score unverified phases.`;
+}
+
+function primaryImprovementBlock(mode: AnalysisRequestMetadata['mode']): string {
+  if (mode !== 'PERFORMANCE') return '';
+
+  return `PRIMARY IMPROVEMENT (PERFORMANCE ONLY — required fields):
+- primaryImprovementArea: exactly one of ${PERFORMANCE_PRIMARY_IMPROVEMENT_AREAS.map((a) => `"${a}"`).join(', ')}, OR null.
+- primaryImprovementReasoning: 1–2 sentences explaining why that area is the priority, OR null.
+- Use null for BOTH fields when performance is strong across the board with no clear single weakness.
+- Do NOT force the lowest-scoring category if there is no meaningful standout weakness.`;
 }
 
 function playerTrackingBlock(metadata: AnalysisRequestMetadata): string {
@@ -267,8 +289,6 @@ ${objectiveTimelineBlock(clipDurationSec)}
 
 ${goalBlock}
 
-${scoringCalibrationBlock(metadata.mode)}
-
 ${selectionQualityBlock(metadata)}
 
 ${identityProfileBlock(metadata)}
@@ -282,6 +302,10 @@ ${questionBlock}
 ${scoresBlock}
 
 ${extraInstruction}
+
+${scoringCalibrationBlock(metadata.mode)}
+
+${primaryImprovementBlock(metadata.mode)}
 
 Return JSON (identity → timelines → attribution → coaching):
 {

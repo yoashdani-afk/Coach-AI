@@ -101,6 +101,9 @@ export default function RootLayout() {
           <Stack.Screen name="reports/history" />
           <Stack.Screen name="improve/session/index" />
           <Stack.Screen name="improve/session/result" />
+          <Stack.Screen name="improve/week/index" />
+          <Stack.Screen name="improve/week/result" />
+          <Stack.Screen name="improve/week/day/[dayId]" />
           <Stack.Screen name="improve/[categoryId]/index" />
           <Stack.Screen name="improve/[categoryId]/[skillId]/index" />
           <Stack.Screen name="improve/[categoryId]/[skillId]/muscle/[muscleGroupId]" />

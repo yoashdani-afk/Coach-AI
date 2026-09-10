@@ -68,12 +68,14 @@ export function mapResponseToReport(
         overallScore: overallScoreFromCategories(categories, response),
         topStrength: firstOrJoin(response.strengths, response.whatHappened),
         biggestImprovement: firstOrJoin(response.improvements, response.betterOption),
-        coachSummary: [response.summary, response.professionalInsight]
-          .filter(Boolean)
-          .join(' '),
+        coachSummary: response.summary.trim(),
         trainingRecommendation: trainingTakeaway,
         primaryImprovementArea: response.primaryImprovementArea ?? null,
         primaryImprovementReasoning: response.primaryImprovementReasoning ?? null,
+        whatHappened: response.whatHappened.trim(),
+        whyItMattered: response.whyItMattered.trim(),
+        betterOption: response.betterOption.trim(),
+        professionalInsight: response.professionalInsight.trim(),
       };
     }
 
@@ -88,15 +90,13 @@ export function mapResponseToReport(
         mode: 'GOAL',
         categories,
         overallScore: overallScoreFromCategories(categories, response),
-        whyScoredThisWay: [
-          response.whatHappened,
-          response.whyItMattered,
-          response.professionalInsight,
-        ]
-          .filter(Boolean)
-          .join(' '),
+        whyScoredThisWay: response.summary.trim(),
         excellentPoint: firstOrJoin(response.strengths, response.whatHappened),
         couldBeBetter: firstOrJoin(response.improvements, response.betterOption),
+        whatHappened: response.whatHappened.trim(),
+        whyItMattered: response.whyItMattered.trim(),
+        betterOption: response.betterOption.trim(),
+        professionalInsight: response.professionalInsight.trim(),
       };
     }
   }

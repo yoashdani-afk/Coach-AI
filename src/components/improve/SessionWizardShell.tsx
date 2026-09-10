@@ -9,6 +9,7 @@ interface SessionWizardShellProps {
   totalSteps: number;
   title: string;
   subtitle?: string;
+  headerTitle?: string;
   onBack?: () => void;
   onContinue: () => void;
   continueLabel?: string;
@@ -21,6 +22,7 @@ export function SessionWizardShell({
   totalSteps,
   title,
   subtitle,
+  headerTitle = 'Build a session',
   onBack,
   onContinue,
   continueLabel = 'Continue',
@@ -43,7 +45,7 @@ export function SessionWizardShell({
         ) : (
           <View className="w-10 mr-2" />
         )}
-        <Text className="text-text-primary text-lg font-semibold flex-1">Build a session</Text>
+        <Text className="text-text-primary text-lg font-semibold flex-1">{headerTitle}</Text>
       </View>
 
       <ScrollView

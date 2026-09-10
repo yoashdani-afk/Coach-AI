@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui';
@@ -13,6 +13,14 @@ import { useAnalysisStore } from '@/stores/analysisStore';
 import { useProfileStore } from '@/stores/profileStore';
 import { useUploadStore } from '@/stores/uploadStore';
 
+function showNotice(title: string, message: string) {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+  Alert.alert(title, message);
+}
+
 export default function ReportScreen() {
   const { id, preview, hof } = useLocalSearchParams<{ id: string; preview?: string; hof?: string }>();
   const router = useRouter();
@@ -24,8 +32,9 @@ export default function ReportScreen() {
   const profile = useProfileStore((s) => s.profile);
   const clearDraft = useUploadStore((s) => s.clearDraft);
   const clearHallOfFameUnlock = useUploadStore((s) => s.clearHallOfFameUnlock);
-  const { isReportSubmitted, tryAutoInductFromReport } = useHallOfFame();
+  const { isReportSubmitted, tryAutoInductFromReport, isSubmitting } = useHallOfFame();
   const [inductedOnSave, setInductedOnSave] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const isPreview = preview === '1';
   const report = savedReport ?? (isPreview && pendingReport?.id === id ? pendingReport : null);
@@ -37,17 +46,33 @@ export default function ReportScreen() {
 
   const celebrationTitle = pendingHallOfFameUnlock?.playTitle;
 
-  const handleSave = () => {
-    if (!report || savedReport) return;
+  const handleSave = async () => {
+    if (!report || savedReport || saving) return;
+    setSaving(true);
     addReport(report);
 
+    let inducted = inductedOnSave;
     if (profile) {
-      const result = tryAutoInductFromReport(report, profile);
-      if (result.ok) setInductedOnSave(true);
+      const result = await tryAutoInductFromReport(report, profile);
+      if (result.ok) {
+        setInductedOnSave(true);
+        inducted = true;
+      } else if (result.reason === 'not_signed_in') {
+        showNotice(
+          'Sign in required',
+          result.message ?? 'Sign in to induct this play into the Hall of Fame.'
+        );
+      } else if (result.reason === 'network_error') {
+        showNotice(
+          'Hall of Fame unavailable',
+          result.message ?? 'Could not upload your play. Your report was still saved locally.'
+        );
+      }
     }
 
     clearDraft();
-    router.replace(`/report/${report.id}${inHallOfFame || inductedOnSave ? '?hof=1' : ''}`);
+    setSaving(false);
+    router.replace(`/report/${report.id}${inducted ? '?hof=1' : ''}`);
   };
 
   const handleAnalyzeAnother = () => {
@@ -78,7 +103,13 @@ export default function ReportScreen() {
       <CoachChat report={report} />
       {showPreviewActions ? (
         <>
-          <Button label="Save report" onPress={handleSave} fullWidth size="lg" />
+          <Button
+            label="Save report"
+            onPress={() => void handleSave()}
+            fullWidth
+            size="lg"
+            loading={saving || isSubmitting}
+          />
           <Button
             label="Analyze another clip"
             variant="secondary"

@@ -7,8 +7,8 @@ import type {
 } from '@/types/hallOfFame';
 
 /**
- * Remote implementation will fetch from API and replace the local store.
- * UI should depend on this interface (via hallOfFameService), not AsyncStorage.
+ * Remote Hall of Fame is implemented via Supabase in hallOfFameService.
+ * UI should depend on hallOfFameService / useHallOfFame, not AsyncStorage.
  */
 export type { HallOfFameRepository, GoalSubmission, LeaderboardEntry, Challenge, SubmitGoalResult };
 

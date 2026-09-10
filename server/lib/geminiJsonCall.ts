@@ -77,6 +77,8 @@ export async function callGeminiJson(params: {
         usageMetadata: result.usageMetadata,
         promptFeedback: result.promptFeedback,
         sdkHttpResponse: result.sdkHttpResponse,
+        modelVersion: result.modelVersion ?? null,
+        responseId: result.responseId ?? null,
       },
       { label: params.label, inlineSystemInstruction: false }
     );

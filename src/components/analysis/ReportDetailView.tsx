@@ -2,12 +2,12 @@ import { ScrollView, View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CategoryScoreList } from '@/components/analysis/CategoryScoreList';
+import { VideoPreview } from '@/components/analysis/VideoPreview';
 import { Button, Card } from '@/components/ui';
 import { labelForAnalysisMode } from '@/lib/constants';
 import { formatReportDate } from '@/lib/format';
 import {
   mapPerformanceImprovementToSkill,
-  performanceImprovementSkillHref,
   performanceImprovementToSessionTarget,
 } from '@/lib/performanceImprovementMapping';
 import { reportSourceLabel, reportOverallScoreLabel, isGeminiAnalysedReport, resolveReportSource } from '@/lib/reportSource';
@@ -24,12 +24,18 @@ export function ReportDetailView({ report, bottomPadding = 24, footer }: ReportD
   const clipLabel = report.clip.fileName ?? 'Selected clip';
   const source = resolveReportSource(report);
   const sourceLabel = reportSourceLabel(report);
+  const clipUri = report.clip?.uri ?? '';
 
   return (
     <ScrollView
       contentContainerStyle={{ paddingBottom: bottomPadding, gap: 16 }}
       showsVerticalScrollIndicator={false}
     >
+      <View className="gap-2">
+        <Text className="text-text-muted text-xs uppercase tracking-wider px-1">Your clip</Text>
+        <VideoPreview uri={clipUri} />
+      </View>
+
       <View
         className={`rounded-xl px-4 py-3 gap-1 border ${
           source === 'gemini'
@@ -124,20 +130,14 @@ function PerformanceSections({
   const primaryArea = report.primaryImprovementArea ?? null;
   const primaryReasoning = report.primaryImprovementReasoning ?? null;
   const mappedSkill = primaryArea ? mapPerformanceImprovementToSkill(primaryArea) : null;
-  const skillHref = primaryArea ? performanceImprovementSkillHref(primaryArea) : null;
 
-  const openSkill = () => {
-    if (!skillHref) return;
-    router.push(skillHref as `/improve/${string}/${string}`);
-  };
-
-  const openSessionWizard = () => {
+  const openImproveSession = () => {
     if (!primaryArea) return;
     const target = performanceImprovementToSessionTarget(primaryArea);
     if (!target) return;
     resetDraft();
     setTarget(target);
-    router.push('/improve/session');
+    router.push('/improve/session?lockedTarget=1');
   };
 
   return (
@@ -151,6 +151,9 @@ function PerformanceSections({
           isAiAnalysed={aiAnalysed}
         />
       </ReportSection>
+
+      <NarrativeSection title="What Happened" text={report.whatHappened} />
+      <NarrativeSection title="Why It Mattered" text={report.whyItMattered} />
 
       <ReportSection title="Top strength">
         <Card variant="outlined" className="bg-primary-muted/20 border-primary/20">
@@ -170,19 +173,11 @@ function PerformanceSections({
             {primaryReasoning ? (
               <Text className="text-text-secondary text-base leading-6">{primaryReasoning}</Text>
             ) : null}
-            <View className="gap-3">
-              <Button
-                label={`Open ${primaryArea} drills`}
-                onPress={openSkill}
-                fullWidth
-              />
-              <Button
-                label="Build a session to improve this"
-                variant="secondary"
-                onPress={openSessionWizard}
-                fullWidth
-              />
-            </View>
+            <Button
+              label={`Improve ${primaryArea}`}
+              onPress={openImproveSession}
+              fullWidth
+            />
           </Card>
         ) : (
           <Card variant="outlined" className="bg-primary-muted/20 border-primary/20 gap-2">
@@ -202,6 +197,9 @@ function PerformanceSections({
           <Text className="text-text-secondary text-base leading-6">{report.biggestImprovement}</Text>
         </Card>
       </ReportSection>
+
+      <NarrativeSection title="A Better Option" text={report.betterOption} />
+      <NarrativeSection title="Professional Insight" text={report.professionalInsight} />
 
       <ReportSection title="Coach's summary">
         <Text className="text-text-secondary text-base leading-6">{report.coachSummary}</Text>
@@ -233,6 +231,9 @@ function GoalSections({ report }: { report: Extract<CoachingReport, { mode: 'GOA
         />
       </ReportSection>
 
+      <NarrativeSection title="What Happened" text={report.whatHappened} />
+      <NarrativeSection title="Why It Mattered" text={report.whyItMattered} />
+
       <ReportSection title="Why it scored this way">
         <Text className="text-text-secondary text-base leading-6">{report.whyScoredThisWay}</Text>
       </ReportSection>
@@ -243,12 +244,25 @@ function GoalSections({ report }: { report: Extract<CoachingReport, { mode: 'GOA
         </Card>
       </ReportSection>
 
+      <NarrativeSection title="A Better Option" text={report.betterOption} />
+      <NarrativeSection title="Professional Insight" text={report.professionalInsight} />
+
       <ReportSection title="One thing that could make it even better">
         <Card variant="outlined">
           <Text className="text-text-secondary text-base leading-6">{report.couldBeBetter}</Text>
         </Card>
       </ReportSection>
     </>
+  );
+}
+
+function NarrativeSection({ title, text }: { title: string; text?: string | null }) {
+  const trimmed = text?.trim() ?? '';
+  if (!trimmed) return null;
+  return (
+    <ReportSection title={title}>
+      <Text className="text-text-secondary text-base leading-6">{trimmed}</Text>
+    </ReportSection>
   );
 }
 

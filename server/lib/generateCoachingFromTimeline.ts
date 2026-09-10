@@ -5,7 +5,7 @@ import { callGeminiJson } from './geminiJsonCall.js';
 import { extractJsonText } from './parseResponse.js';
 import { ServerAnalysisError } from './analysisErrors.js';
 import { calibrateScores } from './scoreCalibration.js';
-import { parsePerformancePrimaryImprovement } from './buildPrompt.js';
+import { goalScoreCalibrationBlock, parsePerformancePrimaryImprovement } from './buildPrompt.js';
 
 function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value.trim() : fallback;
@@ -85,6 +85,8 @@ function buildCoachingUserPrompt(
         ? 'SCORES: Decision Making, Positioning, Scanning, Movement, First Touch, Composure, Communication — only for CONFIRMED actions.'
         : 'SCORES: [] for COACH_ME.';
 
+  const goalCalibration = mode === 'GOAL' ? goalScoreCalibrationBlock() : '';
+
   const performanceImprovementBlock =
     mode === 'PERFORMANCE'
       ? `PRIMARY IMPROVEMENT (required):
@@ -100,7 +102,9 @@ function buildCoachingUserPrompt(
   "primaryImprovementReasoning": "string|null"`
       : '';
 
-  return `${goalModeRules(factual)}
+  const modeRules = mode === 'GOAL' ? goalModeRules(factual) : '';
+
+  return `${modeRules}
 
 PLAYER: ${profile.firstName}, ${profile.age}, ${profile.mainPosition}, ${profile.playingLevel}
 MODE: ${mode}
@@ -123,9 +127,13 @@ ${questionBlock}
 
 ${scoresBlock}
 
+${goalCalibration}
+
 ${performanceImprovementBlock}
 
 ${extraInstruction}
+
+Do not add events beyond the FACTUAL TIMELINES above.
 
 Return JSON:
 {

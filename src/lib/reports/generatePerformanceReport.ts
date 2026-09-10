@@ -90,6 +90,10 @@ export function generatePerformanceReport(params: {
     biggestImprovement: performanceImprovement(bottom.key, bottom.score, seed),
     coachSummary,
     trainingRecommendation: performanceTraining(bottom.key, ctx.footLabel, seed),
+    whatHappened: coachSummary,
+    whyItMattered: performanceStrength(top.key, top.score, seed),
+    betterOption: performanceImprovement(bottom.key, bottom.score, seed),
+    professionalInsight: performanceTraining(bottom.key, ctx.footLabel, seed),
     ...baseReportFields(clip),
   };
 }

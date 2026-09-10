@@ -106,10 +106,12 @@ export async function extractDenseFrames(
       });
     }
 
+    const frameTimestamps = frames.map((frame) => frame.timestampMs);
     console.log('[DenseFrames]', {
       videoDurationMs,
       fps,
       frameCount: frames.length,
+      frameTimestamps,
       width,
       height,
     });

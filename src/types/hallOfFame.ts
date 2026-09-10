@@ -49,6 +49,8 @@ export interface GoalSubmission {
   submittedAt: string;
   source: 'user' | 'demo';
   autoInducted?: boolean;
+  /** Supabase auth user id when loaded/saved remotely. */
+  ownerUserId?: string;
 }
 
 export interface LeaderboardEntry {
@@ -69,7 +71,16 @@ export interface Challenge {
 
 export type SubmitGoalResult =
   | { ok: true; playTitle?: string }
-  | { ok: false; reason: 'duplicate' | 'invalid_report' };
+  | {
+      ok: false;
+      reason:
+        | 'duplicate'
+        | 'invalid_report'
+        | 'entry_limit'
+        | 'not_signed_in'
+        | 'network_error';
+      message?: string;
+    };
 
 export interface HallOfFameUnlockPreview {
   reportId: string;

@@ -126,21 +126,6 @@ export const ANALYSIS_MODES: {
   primary?: boolean;
 }[] = [
   {
-    mode: 'COACH_ME',
-    label: 'Coach Me',
-    emoji: '🧠',
-    description: 'Ask a football question about a specific moment.',
-    examples: [
-      'Was this the right decision?',
-      'What should I have done?',
-      'Analyse my positioning',
-      'Analyse my technique',
-      'What did I do well?',
-    ],
-    icon: 'chatbubbles-outline',
-    primary: true,
-  },
-  {
     mode: 'PERFORMANCE',
     label: 'Analyze my performance',
     emoji: '⭐',
@@ -163,6 +148,21 @@ export const ANALYSIS_MODES: {
     description: 'Analyse one goal or attacking action.',
     examples: ['Finish', 'Technique', 'Difficulty', 'Creativity', 'Decision', 'Composure'],
     icon: 'football-outline',
+  },
+  {
+    mode: 'COACH_ME',
+    label: 'Coach Me',
+    emoji: '🧠',
+    description: 'Ask a football question about a specific moment.',
+    examples: [
+      'Was this the right decision?',
+      'What should I have done?',
+      'Analyse my positioning',
+      'Analyse my technique',
+      'What did I do well?',
+    ],
+    icon: 'chatbubbles-outline',
+    primary: true,
   },
 ];
 

@@ -9,6 +9,7 @@ import type {
   ImproveDrill,
   ImproveDrillDifficulty,
   ImproveMuscleGroupId,
+  ImproveSessionFlow,
 } from '@/types/improve';
 import type { ImprovementGoal, PlayerProfile, PlayingLevel } from '@/types/profile';
 import {
@@ -181,6 +182,29 @@ function resolveTargetSkill(target: SessionTarget, profile: PlayerProfile | null
     return { categoryId: target.categoryId, skillId: target.skillId };
   }
   return resolveProfileSkill(profile);
+}
+
+function skillTitleForPair(pair: SkillPair): string {
+  const category = getAllImproveCategories().find((c) => c.id === pair.categoryId);
+  const skill = category?.skills.find((s) => s.id === pair.skillId);
+  return skill?.title ?? 'this skill';
+}
+
+/** Clear copy when a locked single-skill session cannot fill desiredCount. */
+function shortSingleSkillPoolNote(
+  skillTitle: string,
+  count: number,
+  hasPartner: boolean
+): string {
+  if (count === 0) {
+    return hasPartner
+      ? `No ${skillTitle} drills currently match your filters. Try a different intensity or situation, or check back as more content is added.`
+      : `No solo ${skillTitle} drills currently match your filters. Try adding a partner, or check back as more content is added.`;
+  }
+  if (!hasPartner) {
+    return `Only ${count} solo ${skillTitle} drills are currently available. Try adding a partner, or check back as more content is added.`;
+  }
+  return `Only ${count} ${skillTitle} drills currently match your filters. Check back as more content is added.`;
 }
 
 function preMatchAllowedSkill(categoryId: ImproveCategoryId, skillId: string): boolean {
@@ -372,6 +396,67 @@ function pickAscendingByDifficulty(candidates: CandidateDrill[], count: number):
       if (ordered.length >= count) return ordered;
     }
   }
+  return ordered;
+}
+
+const SESSION_FLOW_ORDER: ImproveSessionFlow[] = [
+  'foundation',
+  'combination',
+  'dynamic',
+  'game-realistic',
+];
+
+function sessionFlowRank(flow: ImproveSessionFlow | undefined): number | null {
+  if (flow == null) return null;
+  const idx = SESSION_FLOW_ORDER.indexOf(flow);
+  return idx === -1 ? null : idx;
+}
+
+/**
+ * Single-skill pick order:
+ * - If any candidates have sessionFlow: foundation → combination → dynamic → game-realistic,
+ *   then ascending difficulty within each stage (shuffle ties).
+ * - Untagged drills are ordered by difficulty only (same as legacy), after tagged stages.
+ * - If nobody is tagged: fall back to pure difficulty sort.
+ */
+function pickBySessionFlowThenDifficulty(
+  candidates: CandidateDrill[],
+  count: number
+): CandidateDrill[] {
+  const tagged = candidates.filter((c) => sessionFlowRank(c.drill.sessionFlow) != null);
+  if (tagged.length === 0) {
+    return pickAscendingByDifficulty(candidates, count);
+  }
+
+  const untagged = candidates.filter((c) => sessionFlowRank(c.drill.sessionFlow) == null);
+  const ordered: CandidateDrill[] = [];
+  const used = new Set<string>();
+
+  const takeGroup = (group: CandidateDrill[]) => {
+    const byDiff = new Map<number, CandidateDrill[]>();
+    for (const c of group) {
+      const list = byDiff.get(c.drill.difficulty) ?? [];
+      list.push(c);
+      byDiff.set(c.drill.difficulty, list);
+    }
+    for (const diff of [1, 2, 3, 4, 5]) {
+      for (const c of shuffle(byDiff.get(diff) ?? [])) {
+        if (used.has(c.drill.id)) continue;
+        ordered.push(c);
+        used.add(c.drill.id);
+        if (ordered.length >= count) return true;
+      }
+    }
+    return false;
+  };
+
+  for (const flow of SESSION_FLOW_ORDER) {
+    const group = tagged.filter((c) => c.drill.sessionFlow === flow);
+    if (takeGroup(group)) return ordered;
+  }
+
+  // Untagged leftovers — difficulty-only, after all flow stages
+  takeGroup(untagged);
   return ordered;
 }
 
@@ -680,7 +765,11 @@ export function generateImproveSession(
     }
   }
 
-  if (candidates.length < desiredCount && !recoveryOnly) {
+  // Cross-skill expansion is ONLY for paths that are already multi-skill
+  // (e.g. pre-match when the target skill isn't allowed). Single-skill sessions —
+  // manual skill pick OR profile (which currently resolves to one skill) — must
+  // stay inside the target skill even if that means fewer drills than desiredCount.
+  if (candidates.length < desiredCount && !recoveryOnly && !isSingleSkillSession) {
     notes.push('Skill pool was expanded to find enough matching drills.');
     const jugglingOk = primarySkill.skillId === 'juggling';
     const expanded = (
@@ -689,7 +778,6 @@ export function generateImproveSession(
         : listAllSkillPairs()
     ).filter((p) => jugglingOk || p.skillId !== 'juggling');
     skillPairs = expanded;
-    isSingleSkillSession = false;
     candidates = collectCandidates(
       skillPairs,
       inputsWithoutLocation,
@@ -698,9 +786,15 @@ export function generateImproveSession(
     );
   }
 
-  if (candidates.length < desiredCount && !rehab) {
+  // Still within current skillPairs (target skill for single-skill sessions).
+  if (
+    candidates.length < desiredCount &&
+    !rehab &&
+    (difficultyBand[0] !== 1 || difficultyBand[1] !== 5)
+  ) {
     const fullyOpen: [ImproveDrillDifficulty, ImproveDrillDifficulty] = [1, 5];
-    notes.push('Filters were relaxed further so a full session could be built.');
+    notes.push('Difficulty range was widened further within this skill to find more drills.');
+    difficultyBand = fullyOpen;
     candidates = collectCandidates(skillPairs, inputsWithoutLocation, fullyOpen, {
       ...filterOptions,
       allowRecoveryJuggling: recoveryOnly ? allowRecoveryJuggling : false,
@@ -724,7 +818,7 @@ export function generateImproveSession(
       drillMatchesLocation(c.drill.equipment, resolvedLocation!, c.drill.id)
     );
 
-    // If location filter thins the pool, widen difficulty but keep location fixed
+    // If location filter thins the pool, widen difficulty but keep location + skill fixed
     if (candidates.length < desiredCount && !rehab) {
       const widened = widenBand(difficultyBand, 1);
       if (widened[0] !== difficultyBand[0] || widened[1] !== difficultyBand[1]) {
@@ -734,9 +828,14 @@ export function generateImproveSession(
       }
     }
 
-    if (candidates.length < desiredCount && !rehab) {
+    if (
+      candidates.length < desiredCount &&
+      !rehab &&
+      (difficultyBand[0] !== 1 || difficultyBand[1] !== 5)
+    ) {
       const fullyOpen: [ImproveDrillDifficulty, ImproveDrillDifficulty] = [1, 5];
-      notes.push('Filters were relaxed further so a full session could be built.');
+      notes.push('Difficulty range was widened further within this skill to find more drills.');
+      difficultyBand = fullyOpen;
       candidates = collectCandidates(skillPairs, locatedInputs, fullyOpen, {
         ...filterOptions,
         allowRecoveryJuggling: false,
@@ -748,7 +847,7 @@ export function generateImproveSession(
 
   let picked: CandidateDrill[];
   if (isSingleSkillSession) {
-    picked = pickAscendingByDifficulty(candidates, desiredCount);
+    picked = pickBySessionFlowThenDifficulty(candidates, desiredCount);
   } else if (allowRecoveryJuggling) {
     const jugglingCandidates = candidates.filter((c) => c.skillId === 'juggling');
     const recoveryCandidates = candidates.filter((c) => c.skillId !== 'juggling');
@@ -767,7 +866,17 @@ export function generateImproveSession(
   }
 
   if (picked.length < desiredCount) {
-    notes.push(`Only ${picked.length} matching drills were available for these inputs.`);
+    if (isSingleSkillSession) {
+      notes.push(
+        shortSingleSkillPoolNote(
+          skillTitleForPair(primarySkill),
+          picked.length,
+          inputs.hasPartner
+        )
+      );
+    } else {
+      notes.push(`Only ${picked.length} matching drills were available for these inputs.`);
+    }
   }
 
   const mainDrills: SessionDrillRef[] = picked.map(({ categoryId, skillId, drill }) => ({

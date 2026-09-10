@@ -76,6 +76,8 @@ export async function handleAnalyseVideo(req: Request, res: Response): Promise<v
       bytes: file.buffer.length,
       mode: metadata.mode,
       pipeline: process.env.ANALYSIS_PIPELINE?.trim() || 'dense_timeline',
+      /** Client-reported clip duration — compare across re-uploads of the "same" clip. */
+      clipDurationMs: metadata.clip?.durationMs ?? null,
     });
 
     // TODO: future — crop/extract frames around playerSelection.timestampMs

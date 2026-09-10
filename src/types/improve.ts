@@ -9,6 +9,9 @@ export type ImproveDrillPartnerRequirement = 'solo' | 'partner' | 'group';
 
 export type ImproveDrillDifficulty = 1 | 2 | 3 | 4 | 5;
 
+/** Session sequencing stage — used to order single-skill personalized sessions. */
+export type ImproveSessionFlow = 'foundation' | 'combination' | 'dynamic' | 'game-realistic';
+
 export type ImproveMuscleGroupId =
   | 'core'
   | 'quads'
@@ -46,6 +49,12 @@ export interface ImproveDrill {
   videoUrl?: string;
   videoTimestamp?: string;
   videoTimestampSeconds?: number;
+  /**
+   * Optional session-flow stage for personalized session ordering.
+   * When present on single-skill sessions: foundation → combination → dynamic → game-realistic,
+   * then difficulty within each stage. Untagged drills keep difficulty-only sort.
+   */
+  sessionFlow?: ImproveSessionFlow;
   /** Optional primary muscle group — used to gate Strength-style muscle selection. */
   muscleGroup?: ImproveMuscleGroupId;
   /** Optional Speed training focus — used to gate Speed-style focus selection. */

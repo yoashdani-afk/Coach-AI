@@ -150,12 +150,19 @@ export default function AnalysingScreen() {
 
         if (hallOfFameUnlock && profile) {
           addReport(result.report);
-          hallOfFameService.tryAutoInductFromReport(result.report, profile);
-          setPendingHallOfFameUnlock(hallOfFameUnlock);
-          clearDraft();
-          setIsAnalysing(false);
-          router.replace(`/report/${result.report.id}?hof=1`);
-          return;
+          const induct = await hallOfFameService.tryAutoInductFromReport(
+            result.report,
+            profile
+          );
+          if (induct.ok) {
+            setPendingHallOfFameUnlock(hallOfFameUnlock);
+            clearDraft();
+            setIsAnalysing(false);
+            router.replace(`/report/${result.report.id}?hof=1`);
+            return;
+          }
+          console.warn('[HallOfFame] Auto-induct skipped', induct);
+          // Fall through to normal preview when unsigned / limit / network error.
         }
 
         setPendingHallOfFameUnlock(null);

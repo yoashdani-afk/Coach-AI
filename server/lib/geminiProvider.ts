@@ -49,6 +49,40 @@ const MAX_PROCESSING_WAIT_MS = 90_000;
 const FILE_POLL_MS = 2_000;
 const MAX_MODEL_ATTEMPTS = 8;
 
+/** Raised when Gemini Files API marks an uploaded video as FAILED (eligible for one re-upload retry). */
+class GeminiFileFailedError extends Error {
+  constructor(
+    message: string,
+    readonly fileName: string,
+    readonly fileError: unknown
+  ) {
+    super(message);
+    this.name = 'GeminiFileFailedError';
+  }
+}
+
+function summarizeGeminiFile(file: {
+  name?: string;
+  state?: FileState;
+  mimeType?: string;
+  sizeBytes?: string;
+  error?: { message?: string; code?: number; details?: Record<string, unknown>[] };
+}) {
+  return {
+    fileName: file.name,
+    state: file.state,
+    mimeType: file.mimeType,
+    sizeBytes: file.sizeBytes,
+    error: file.error
+      ? {
+          message: file.error.message,
+          code: file.error.code,
+          details: file.error.details,
+        }
+      : null,
+  };
+}
+
 /** Temporarily disabled — rethrow the original SDK error after logging. */
 function logAndRethrowGeminiError(
   error: unknown,
@@ -120,16 +154,40 @@ async function waitForFileActive(
 ): Promise<{ uri: string; mimeType: string }> {
   const started = Date.now();
   let file = await ai.files.get({ name: fileName });
+  let pollCount = 0;
 
   while (file.state !== FileState.ACTIVE) {
+    pollCount += 1;
+    console.log('[Gemini] File processing poll', {
+      model: modelName,
+      pollCount,
+      elapsedMs: Date.now() - started,
+      ...summarizeGeminiFile({ ...file, name: file.name ?? fileName }),
+    });
+
     if (file.state === FileState.FAILED) {
-      throw new ServerAnalysisError(
-        'Gemini failed to process the uploaded video',
-        'GEMINI_PROCESSING_FAILED'
+      const summary = summarizeGeminiFile({ ...file, name: file.name ?? fileName });
+      console.error('[Gemini] File processing FAILED', {
+        model: modelName,
+        pollCount,
+        elapsedMs: Date.now() - started,
+        ...summary,
+      });
+      throw new GeminiFileFailedError(
+        file.error?.message?.trim() ||
+          'Gemini failed to process the uploaded video',
+        fileName,
+        summary.error
       );
     }
 
     if (Date.now() - started > MAX_PROCESSING_WAIT_MS) {
+      console.error('[Gemini] File processing timed out', {
+        model: modelName,
+        pollCount,
+        elapsedMs: Date.now() - started,
+        ...summarizeGeminiFile({ ...file, name: file.name ?? fileName }),
+      });
       throw new ServerAnalysisError(
         'Gemini video processing timed out',
         'GEMINI_PROCESSING_FAILED'
@@ -147,8 +205,82 @@ async function waitForFileActive(
     );
   }
 
-  console.log('[Gemini] Video file ACTIVE', { model: modelName, fileName });
+  console.log('[Gemini] Video file ACTIVE', {
+    model: modelName,
+    fileName,
+    pollCount,
+    elapsedMs: Date.now() - started,
+    mimeType: file.mimeType,
+    sizeBytes: file.sizeBytes,
+  });
   return { uri: file.uri, mimeType: file.mimeType };
+}
+
+async function uploadNormalizedVideoForAnalysis(params: {
+  ai: GoogleGenAI;
+  modelName: string;
+  normalizedVideoPath: string;
+  uploadMimeType: string;
+  displayName: string;
+  localDetectedMimeType: string;
+  originalBytes: number;
+  normalizedWidth: number;
+  normalizedHeight: number;
+  appliedRotation: number;
+  contentOrder: string[];
+}): Promise<{
+  uploadedFileName: string;
+  uploadedMimeType: string;
+  activeFile: { uri: string; mimeType: string };
+}> {
+  const uploadedFile = await params.ai.files
+    .upload({
+      file: params.normalizedVideoPath,
+      config: {
+        mimeType: params.uploadMimeType,
+        displayName: params.displayName,
+      },
+    })
+    .catch((error: unknown) =>
+      logAndRethrowGeminiError(error, params.modelName, GEMINI_FILES_UPLOAD_ENDPOINT)
+    );
+
+  if (!uploadedFile.name) {
+    throw new ServerAnalysisError(
+      'Gemini file upload did not return a file name',
+      'GEMINI_PROCESSING_FAILED'
+    );
+  }
+
+  if (!uploadedFile.mimeType) {
+    throw new ServerAnalysisError(
+      'Gemini file upload did not return a MIME type',
+      'GEMINI_PROCESSING_FAILED'
+    );
+  }
+
+  console.log('[Gemini] Video uploaded to Files API', {
+    model: params.modelName,
+    fileName: uploadedFile.name,
+    bytes: params.originalBytes,
+    localDetectedMimeType: params.localDetectedMimeType,
+    uploadMimeTypeDeclared: params.uploadMimeType,
+    uploadedFileMimeType: uploadedFile.mimeType,
+    appliedRotation: params.appliedRotation,
+    normalizedVideoPath: params.normalizedVideoPath,
+    normalizedWidth: params.normalizedWidth,
+    normalizedHeight: params.normalizedHeight,
+    contentOrder: params.contentOrder,
+  });
+
+  logGeminiModel(params.modelName, GEMINI_FILES_GET_ENDPOINT);
+  const activeFile = await waitForFileActive(params.ai, uploadedFile.name, params.modelName);
+
+  return {
+    uploadedFileName: uploadedFile.name,
+    uploadedMimeType: uploadedFile.mimeType,
+    activeFile,
+  };
 }
 
 /** Full uploaded video — no videoMetadata clipping. */
@@ -223,7 +355,7 @@ function buildGenerateContentPayload(
 
   const config: GenerateContentParameters['config'] = {
     responseMimeType: 'application/json',
-    temperature: 0.35,
+    temperature: 0.15,
     topP: 0.95,
     mediaResolution: MediaResolution.MEDIA_RESOLUTION_HIGH,
   };
@@ -261,6 +393,8 @@ async function callGenerateContent(
       usageMetadata: result.usageMetadata,
       promptFeedback: result.promptFeedback,
       sdkHttpResponse: result.sdkHttpResponse,
+      modelVersion: result.modelVersion ?? null,
+      responseId: result.responseId ?? null,
     },
     attempt
   );
@@ -375,7 +509,7 @@ async function analyzeViaInteractions(
     system_instruction: buildSystemInstruction(),
     input,
     generation_config: {
-      temperature: 0.35,
+      temperature: 0.15,
     },
     response_format: {
       type: 'text' as const,
@@ -535,49 +669,83 @@ async function analyseVideoWithGeminiLegacy(params: {
     let modelName = await resolveLegacyAnalysisModel(ai, failedModels);
     logGeminiModel(modelName, GEMINI_FILES_UPLOAD_ENDPOINT);
 
-    const uploadedFile = await ai.files
-      .upload({
-        file: normalizedMedia.normalizedAnalysisVideoPath,
-        config: { mimeType: params.mimeType, displayName: `normalized-${safeName}` },
-      })
-      .catch((error: unknown) =>
-        logAndRethrowGeminiError(error, modelName, GEMINI_FILES_UPLOAD_ENDPOINT)
-      );
+    // Re-encoded (any non-zero rotation) is always H.264/AAC MP4 — do not declare the phone's original MIME.
+    const uploadMimeType =
+      normalizedMedia.appliedRotation !== 0 ? 'video/mp4' : params.mimeType;
 
-    if (!uploadedFile.name) {
-      throw new ServerAnalysisError(
-        'Gemini file upload did not return a file name',
-        'GEMINI_PROCESSING_FAILED'
-      );
-    }
+    const contentOrder = groundingFrames.success
+      ? ['reference-crops', 'clean-frame', 'marked-frame', 'normalized-video', 'coaching-prompt']
+      : ['normalized-video', 'coaching-prompt'];
 
-    if (!uploadedFile.mimeType) {
-      throw new ServerAnalysisError(
-        'Gemini file upload did not return a MIME type',
-        'GEMINI_PROCESSING_FAILED'
-      );
-    }
-
-    uploadedFileName = uploadedFile.name;
-    console.log('[Gemini] Video uploaded to Files API', {
-      model: modelName,
-      fileName: uploadedFileName,
-      bytes: params.videoBuffer.length,
-      localDetectedMimeType: params.mimeType,
-      uploadedFileMimeType: uploadedFile.mimeType,
+    const uploadArgs = {
+      ai,
+      modelName,
       normalizedVideoPath: normalizedMedia.normalizedAnalysisVideoPath,
+      uploadMimeType,
+      displayName: `normalized-${safeName}`,
+      localDetectedMimeType: params.mimeType,
+      originalBytes: params.videoBuffer.length,
       normalizedWidth: normalizedMedia.outputWidth,
       normalizedHeight: normalizedMedia.outputHeight,
-      contentOrder: groundingFrames.success
-        ? ['reference-crops', 'clean-frame', 'marked-frame', 'normalized-video', 'coaching-prompt']
-        : ['normalized-video', 'coaching-prompt'],
-    });
+      appliedRotation: normalizedMedia.appliedRotation,
+      contentOrder,
+    };
 
-    logGeminiModel(modelName, GEMINI_FILES_GET_ENDPOINT);
-    const activeFile = await waitForFileActive(ai, uploadedFileName, modelName);
+    let uploadedMimeType: string;
+    let activeFile: { uri: string; mimeType: string };
+
+    try {
+      const first = await uploadNormalizedVideoForAnalysis(uploadArgs);
+      uploadedFileName = first.uploadedFileName;
+      uploadedMimeType = first.uploadedMimeType;
+      activeFile = first.activeFile;
+    } catch (firstUploadError) {
+      if (!(firstUploadError instanceof GeminiFileFailedError)) {
+        throw firstUploadError;
+      }
+
+      console.warn('[Gemini] File FAILED — attempting one automatic re-upload', {
+        failedFileName: firstUploadError.fileName,
+        fileError: firstUploadError.fileError,
+        message: firstUploadError.message,
+      });
+
+      try {
+        await ai.files.delete({ name: firstUploadError.fileName });
+      } catch (deleteError) {
+        console.warn('[Gemini] Failed to delete FAILED file before retry', {
+          fileName: firstUploadError.fileName,
+          message: errorMessage(deleteError),
+        });
+      }
+
+      uploadedFileName = null;
+
+      try {
+        const retry = await uploadNormalizedVideoForAnalysis({
+          ...uploadArgs,
+          displayName: `normalized-retry-${safeName}`,
+        });
+        uploadedFileName = retry.uploadedFileName;
+        uploadedMimeType = retry.uploadedMimeType;
+        activeFile = retry.activeFile;
+        console.log('[Gemini] Re-upload succeeded after FAILED', {
+          fileName: retry.uploadedFileName,
+        });
+      } catch (retryError) {
+        if (retryError instanceof GeminiFileFailedError) {
+          throw new ServerAnalysisError(
+            retryError.message || 'Gemini failed to process the uploaded video',
+            'GEMINI_PROCESSING_FAILED'
+          );
+        }
+        throw retryError;
+      }
+    }
+
     const readyFile = resolveGeminiVideoFileForGenerateContent({
-      localDetectedMimeType: params.mimeType,
-      uploadedMimeType: uploadedFile.mimeType,
+      localDetectedMimeType: uploadMimeType,
+      uploadedMimeType,
       activeFile,
     });
 

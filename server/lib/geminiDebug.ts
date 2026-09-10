@@ -57,16 +57,24 @@ export function logGeminiSuccessResponse(
     usageMetadata?: unknown;
     promptFeedback?: unknown;
     sdkHttpResponse?: unknown;
+    /** Exact underlying model build from the API (not just the request alias). */
+    modelVersion?: string | null;
+    /** Per-response id for correlating good vs bad runs. */
+    responseId?: string | null;
   },
   attempt: GenerateContentAttemptOptions
 ): void {
   console.log('[Gemini] ── RESPONSE BODY (success) ──', {
     operation,
     attempt: attempt.label,
+    modelVersion: result.modelVersion ?? null,
+    responseId: result.responseId ?? null,
   });
   console.log(
     JSON.stringify(
       {
+        modelVersion: result.modelVersion ?? null,
+        responseId: result.responseId ?? null,
         text: result.text ?? null,
         candidates: result.candidates ?? null,
         usageMetadata: result.usageMetadata ?? null,
