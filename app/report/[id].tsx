@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,11 @@ import { CoachChat } from '@/chat/CoachChat';
 import { HallOfFameCelebration } from '@/components/hallOfFame/HallOfFameCelebration';
 import { ReportDetailView } from '@/components/analysis/ReportDetailView';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
+import {
+  FREE_HOF_ENTRY_LIMIT,
+  PRO_HOF_ENTRY_LIMIT,
+  proPaywallHref,
+} from '@/lib/entitlements';
 import { useHallOfFame } from '@/services/hallOfFame/hallOfFameService';
 import { useChargeAnalysisCreditOnReportOpen } from '@/hooks/useChargeAnalysisCreditOnReportOpen';
 import { useAnalysisStore } from '@/stores/analysisStore';
@@ -21,8 +26,27 @@ function showNotice(title: string, message: string) {
   Alert.alert(title, message);
 }
 
+function promptHofLimitUpgrade(onUpgrade: () => void) {
+  const title = 'Hall of Fame limit reached';
+  const message = `Free accounts can induct ${FREE_HOF_ENTRY_LIMIT} play. Upgrade to Pro for ${PRO_HOF_ENTRY_LIMIT} Hall of Fame slots.`;
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    const go = window.confirm(`${title}\n\n${message}\n\nOpen Upgrade to Pro?`);
+    if (go) onUpgrade();
+    return;
+  }
+  Alert.alert(title, message, [
+    { text: 'Not now', style: 'cancel' },
+    { text: 'Upgrade to Pro', onPress: onUpgrade },
+  ]);
+}
+
 export default function ReportScreen() {
-  const { id, preview, hof } = useLocalSearchParams<{ id: string; preview?: string; hof?: string }>();
+  const { id, preview, hof, hof_limit } = useLocalSearchParams<{
+    id: string;
+    preview?: string;
+    hof?: string;
+    hof_limit?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const savedReport = useAnalysisStore((s) => s.reports.find((r) => r.id === id));
@@ -46,6 +70,11 @@ export default function ReportScreen() {
 
   const celebrationTitle = pendingHallOfFameUnlock?.playTitle;
 
+  useEffect(() => {
+    if (hof_limit !== '1') return;
+    promptHofLimitUpgrade(() => router.push(proPaywallHref('hof')));
+  }, [hof_limit, router]);
+
   const handleSave = async () => {
     if (!report || savedReport || saving) return;
     setSaving(true);
@@ -62,6 +91,8 @@ export default function ReportScreen() {
           'Sign in required',
           result.message ?? 'Sign in to induct this play into the Hall of Fame.'
         );
+      } else if (result.reason === 'entry_limit') {
+        promptHofLimitUpgrade(() => router.push(proPaywallHref('hof')));
       } else if (result.reason === 'network_error') {
         showNotice(
           'Hall of Fame unavailable',

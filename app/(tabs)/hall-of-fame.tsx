@@ -1,12 +1,19 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { HallOfFameGoalCard } from '@/components/hallOfFame/HallOfFameGoalCard';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
-import { Button, Card } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { useHallOfFame } from '@/services/hallOfFame/hallOfFameService';
 import { useAuthStore } from '@/stores/authStore';
+
+const HOF_GOLD = '#F5C542';
+const SURFACE = '#141416';
+const BORDER = 'rgba(255,255,255,0.08)';
+const RADIUS = 20;
 
 function entryKey(id: string, suffix: string): string {
   return `${suffix}-${id}`;
@@ -49,46 +56,49 @@ export default function HallOfFameTabScreen() {
     rank: index + 1,
   }));
 
-  const showInitialLoading = !hasHydrated || (isLoading && userSubmissionCount === 0 && highestRated.length === 0);
+  const showInitialLoading =
+    !hasHydrated || (isLoading && userSubmissionCount === 0 && highestRated.length === 0);
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title="Hall of Fame" subtitle="Your exceptional plays" />
       <ScrollView
         className="flex-1 px-4"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24, gap: 28 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 28, gap: 22, paddingTop: 4 }}
         showsVerticalScrollIndicator={false}
       >
-        <Card
-          variant="outlined"
-          className="flex-row items-center gap-3 bg-primary-muted/20 border-primary/20"
-        >
-          <Text className="text-3xl">🏆</Text>
-          <View className="flex-1">
-            <Text className="text-text-primary font-semibold">Your Hall of Fame</Text>
-            <Text className="text-text-secondary text-sm leading-5 mt-1">
-              Your first successfully analysed Goal-mode clip is inducted automatically when you
-              are signed in. Tap your own entries to open the coaching report.
-            </Text>
-          </View>
-        </Card>
+        <IntroCard />
 
         {!session ? (
-          <Card variant="outlined" className="py-6 px-4 gap-3">
+          <View
+            style={{
+              backgroundColor: SURFACE,
+              borderWidth: 1,
+              borderColor: BORDER,
+              borderRadius: RADIUS,
+              padding: 20,
+              gap: 12,
+            }}
+          >
             <Text className="text-text-primary font-semibold text-center">Sign in required</Text>
             <Text className="text-text-secondary text-sm text-center leading-5">
               Create an account or sign in to induct plays and appear on the global leaderboard.
             </Text>
-            <Button
-              label="Sign in"
-              onPress={() => router.push('/(auth)/login')}
-              fullWidth
-            />
-          </Card>
+            <Button label="Sign in" onPress={() => router.push('/(auth)/login')} fullWidth />
+          </View>
         ) : null}
 
         {error ? (
-          <Card variant="outlined" className="py-5 px-4 gap-3 border-danger/40">
+          <View
+            style={{
+              backgroundColor: 'rgba(255,61,87,0.08)',
+              borderWidth: 1,
+              borderColor: 'rgba(255,61,87,0.35)',
+              borderRadius: RADIUS,
+              padding: 18,
+              gap: 12,
+            }}
+          >
             <Text className="text-danger font-semibold text-center">Could not load Hall of Fame</Text>
             <Text className="text-text-secondary text-sm text-center leading-5">{error}</Text>
             <Button
@@ -100,7 +110,7 @@ export default function HallOfFameTabScreen() {
               }}
               fullWidth
             />
-          </Card>
+          </View>
         ) : null}
 
         {showInitialLoading ? (
@@ -111,16 +121,30 @@ export default function HallOfFameTabScreen() {
         ) : (
           <>
             {session && userSubmissionCount === 0 && !error ? (
-              <Card variant="outlined" className="py-8 px-4">
+              <View
+                style={{
+                  backgroundColor: SURFACE,
+                  borderWidth: 1,
+                  borderColor: BORDER,
+                  borderStyle: 'dashed',
+                  borderRadius: RADIUS,
+                  padding: 24,
+                }}
+              >
                 <Text className="text-text-secondary text-sm text-center leading-5">
                   No inducted plays yet. Complete a Goal-mode analysis while signed in to claim
                   your Hall of Fame slot.
                 </Text>
-              </Card>
+              </View>
             ) : null}
 
             {pinnedEntries.length > 0 ? (
-              <Section title="Highest Rated" subtitle="Pinned to the top">
+              <Section
+                title="Highest Rated"
+                subtitle="Pinned to the top"
+                tone="personal"
+                icon="ribbon"
+              >
                 <View className="gap-3">
                   {pinnedEntries.map((entry) => (
                     <HallOfFameGoalCard
@@ -128,7 +152,8 @@ export default function HallOfFameTabScreen() {
                       entry={entry}
                       pinned
                       isOwn
-                      onPress={() => router.push(`/report/${entry.submission.reportId}`)}
+                      variant="personal"
+                      onPress={() => router.push(`/hall-of-fame/${entry.submission.id}`)}
                     />
                   ))}
                 </View>
@@ -136,7 +161,12 @@ export default function HallOfFameTabScreen() {
             ) : null}
 
             {chronologicalEntries.length > 0 ? (
-              <Section title="Your Inducted Plays" subtitle="Newest first">
+              <Section
+                title="Your Inducted Plays"
+                subtitle="Newest first · private to you"
+                tone="personal"
+                icon="person"
+              >
                 <View className="gap-3">
                   {chronologicalEntries.map((entry) => (
                     <HallOfFameGoalCard
@@ -144,7 +174,8 @@ export default function HallOfFameTabScreen() {
                       entry={entry}
                       pinned={pinnedIds.has(entry.submission.id)}
                       isOwn
-                      onPress={() => router.push(`/report/${entry.submission.reportId}`)}
+                      variant="personal"
+                      onPress={() => router.push(`/hall-of-fame/${entry.submission.id}`)}
                     />
                   ))}
                 </View>
@@ -152,8 +183,13 @@ export default function HallOfFameTabScreen() {
             ) : null}
 
             {highestRated.length > 0 ? (
-              <Section title="Global Leaderboard" subtitle="Top 100 by score · all players">
-                <View className="gap-3">
+              <Section
+                title="Global Leaderboard"
+                subtitle="Top 100 by score · all players"
+                tone="global"
+                icon="globe"
+              >
+                <View className="gap-2.5">
                   {highestRated.map((entry) => {
                     const isOwn =
                       currentUserId != null &&
@@ -164,22 +200,27 @@ export default function HallOfFameTabScreen() {
                         entry={entry}
                         compact
                         isOwn={isOwn}
-                        onPress={
-                          isOwn
-                            ? () => router.push(`/report/${entry.submission.reportId}`)
-                            : undefined
-                        }
+                        variant="global"
+                        onPress={() => router.push(`/hall-of-fame/${entry.submission.id}`)}
                       />
                     );
                   })}
                 </View>
               </Section>
             ) : !showInitialLoading && !error && session ? (
-              <Card variant="outlined" className="py-6 px-4">
+              <View
+                style={{
+                  backgroundColor: SURFACE,
+                  borderWidth: 1,
+                  borderColor: BORDER,
+                  borderRadius: RADIUS,
+                  padding: 20,
+                }}
+              >
                 <Text className="text-text-secondary text-sm text-center leading-5">
                   The global leaderboard is empty. Be the first to induct a Goal-mode play.
                 </Text>
-              </Card>
+              </View>
             ) : null}
 
             {hasHydrated && !isLoading ? (
@@ -194,20 +235,113 @@ export default function HallOfFameTabScreen() {
   );
 }
 
+function IntroCard() {
+  return (
+    <View
+      className="overflow-hidden"
+      style={{
+        borderRadius: RADIUS,
+        borderWidth: 1,
+        borderColor: 'rgba(245,197,66,0.32)',
+      }}
+    >
+      <LinearGradient
+        colors={['rgba(245,197,66,0.18)', 'rgba(20,16,8,0.96)']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ padding: 16, minHeight: 108 }}
+      >
+        <Ionicons
+          name="trophy"
+          size={88}
+          color={HOF_GOLD}
+          style={{
+            position: 'absolute',
+            right: -8,
+            bottom: -14,
+            opacity: 0.1,
+          }}
+        />
+        <View className="flex-row items-start gap-3.5 pr-10">
+          <View
+            className="items-center justify-center"
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              backgroundColor: 'rgba(245,197,66,0.2)',
+              borderWidth: 1,
+              borderColor: 'rgba(245,197,66,0.4)',
+            }}
+          >
+            <Ionicons name="trophy" size={24} color={HOF_GOLD} />
+          </View>
+          <View className="flex-1 gap-1.5">
+            <Text className="text-text-primary font-bold text-[17px] tracking-tight">
+              Your Hall of Fame
+            </Text>
+            <Text className="text-text-secondary text-[13px] leading-5">
+              Your first successfully analysed Goal-mode clip is inducted automatically when you
+              are signed in. Tap any entry to open the full coaching report.
+            </Text>
+          </View>
+        </View>
+      </LinearGradient>
+    </View>
+  );
+}
+
 function Section({
   title,
   subtitle,
   children,
+  tone,
+  icon,
 }: {
   title: string;
   subtitle: string;
-  children: React.ReactNode;
+  children: ReactNode;
+  tone: 'personal' | 'global';
+  icon: 'ribbon' | 'person' | 'globe';
 }) {
+  const accent = tone === 'personal' ? HOF_GOLD : '#8A9BB5';
+  const iconName =
+    icon === 'ribbon' ? 'ribbon' : icon === 'person' ? 'person' : 'globe-outline';
+
   return (
-    <View className="gap-3">
-      <View>
-        <Text className="text-text-primary text-xl font-bold">{title}</Text>
-        <Text className="text-text-muted text-sm mt-0.5">{subtitle}</Text>
+    <View
+      className="gap-3"
+      style={
+        tone === 'global'
+          ? {
+              backgroundColor: 'rgba(255,255,255,0.02)',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.06)',
+              borderRadius: RADIUS,
+              padding: 12,
+              marginHorizontal: -2,
+            }
+          : undefined
+      }
+    >
+      <View className="flex-row items-center gap-2.5 px-0.5">
+        <View
+          className="items-center justify-center"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            backgroundColor: `${accent}22`,
+            borderWidth: 1,
+            borderColor: `${accent}40`,
+          }}
+        >
+          <Ionicons name={iconName} size={16} color={accent} />
+        </View>
+        <View className="flex-1">
+          <Text className="text-text-primary text-[17px] font-bold tracking-tight">{title}</Text>
+          <Text className="text-text-muted text-[12px] mt-0.5">{subtitle}</Text>
+        </View>
       </View>
       {children}
     </View>

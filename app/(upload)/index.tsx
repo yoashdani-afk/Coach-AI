@@ -6,15 +6,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { Button } from '@/components/ui';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { pickVideoFromLibrary, getICloudNotDownloadedMessage } from '@/lib/videoPicker';
-import { FREE_TIER_ANALYSES_PER_MONTH } from '@/lib/constants';
 import { canStartAnalysis, remainingAnalysesLabel } from '@/lib/analysisCredits';
+import { getAnalysisLimit, proPaywallHref } from '@/lib/entitlements';
 import { useAnalysisStore } from '@/stores/analysisStore';
+import { useAuthStore } from '@/stores/authStore';
+import { useIsPro } from '@/stores/entitlementStore';
 import { hasCompleteProfile, useProfileStore } from '@/stores/profileStore';
 import { useUploadStore } from '@/stores/uploadStore';
 
 export default function PickClipScreen() {
   const router = useRouter();
   const profile = useProfileStore((s) => s.profile);
+  const isPro = useIsPro();
+  const analysesMonthlyLimit = useProfileStore((s) => s.analysesMonthlyLimit);
+  const monthlyLimit = Math.max(analysesMonthlyLimit, getAnalysisLimit(isPro));
+  const session = useAuthStore((s) => s.session);
   const isAnalysing = useAnalysisStore((s) => s.isAnalysing);
   const clearDraft = useUploadStore((s) => s.clearDraft);
   const setClip = useUploadStore((s) => s.setClip);
@@ -28,10 +34,21 @@ export default function PickClipScreen() {
       Alert.alert('Analysis in progress', 'Please wait for your current analysis to finish.');
       return;
     }
-    if (!canStartAnalysis(profile)) {
+    if (!session) {
+      Alert.alert('Sign in required', 'Sign in so analysis usage can be tracked on your account.');
+      return;
+    }
+    if (!canStartAnalysis(profile, { monthlyLimit, isSignedIn: true })) {
       Alert.alert(
         'No analyses remaining',
-        `You have used all ${FREE_TIER_ANALYSES_PER_MONTH} free analyses this month.`
+        `You have used all ${monthlyLimit} analyses this month. Upgrade to Pro for 12 analyses / month, or wait until the 1st (UTC).`,
+        [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Upgrade to Pro',
+            onPress: () => router.push(proPaywallHref('analyses')),
+          },
+        ]
       );
       return;
     }
@@ -99,7 +116,7 @@ export default function PickClipScreen() {
         showBack
         onBack={handleBack}
       />
-      <View className="flex-1 px-4 items-center justify-center">
+      <View className="flex-1 px-4 items-center justify-center gap-4">
         <Pressable
           onPress={handlePick}
           disabled={picking}
@@ -113,9 +130,13 @@ export default function PickClipScreen() {
           </Text>
           <Text className="text-text-muted text-sm text-center leading-5">
             Video only · 10 seconds to 5 minutes{'\n'}
-            {remainingAnalysesLabel(profile)}
+            {remainingAnalysesLabel(profile, monthlyLimit)}
           </Text>
         </Pressable>
+        <Text className="text-text-muted text-xs text-center leading-5 px-2">
+          For best results, use clear, stable, well-lit footage where the player is clearly
+          visible. Analysis accuracy may be lower for blurry, dark, or distant footage.
+        </Text>
       </View>
     </View>
   );

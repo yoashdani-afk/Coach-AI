@@ -10,6 +10,7 @@ interface ProfileSetupShellProps {
   totalSteps: number;
   title: string;
   subtitle?: string;
+  footerHint?: string;
   onBack?: () => void;
   onContinue: () => void;
   continueLabel?: string;
@@ -24,6 +25,7 @@ export function ProfileSetupShell({
   totalSteps,
   title,
   subtitle,
+  footerHint = 'This helps us tailor your coaching',
   onBack,
   onContinue,
   continueLabel = 'Continue',
@@ -37,44 +39,52 @@ export function ProfileSetupShell({
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: topPadding }}>
-      <View className="px-5 pt-2 pb-4 flex-row items-center">
+      <View className="px-6 pt-2 pb-2 flex-row items-center">
         {onBack ? (
           <Pressable
             onPress={onBack}
-            className="w-10 h-10 items-center justify-center rounded-full bg-surface mr-2"
+            className="w-10 h-10 items-center justify-center -ml-2"
             accessibilityLabel="Go back"
           >
-            <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
           </Pressable>
         ) : (
-          <View className="w-10 mr-2" />
+          <View className="w-10 -ml-2" />
         )}
-        <Text className="text-text-primary text-lg font-semibold flex-1">Your profile</Text>
+        <View className="flex-1 px-2">
+          <SetupProgress step={step} total={totalSteps} compact />
+        </View>
       </View>
 
       <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        className="flex-1 px-6"
+        contentContainerStyle={{
+          flexGrow: 1,
+          paddingTop: 28,
+          paddingBottom: insets.bottom + 140,
+        }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <SetupProgress step={step} total={totalSteps} />
-        <Text className="text-text-primary text-2xl font-bold mb-2">{title}</Text>
+        <Text className="text-text-primary text-[34px] font-bold leading-10 mb-3">{title}</Text>
         {subtitle ? (
-          <Text className="text-text-secondary text-base mb-6 leading-6">{subtitle}</Text>
+          <Text className="text-text-secondary text-base mb-10 leading-6">{subtitle}</Text>
         ) : (
-          <View className="mb-6" />
+          <View className="mb-10" />
         )}
         {children}
       </ScrollView>
 
       <View
-        className="absolute bottom-0 left-0 right-0 px-5 pt-4 bg-background border-t border-border gap-3"
+        className="absolute bottom-0 left-0 right-0 px-6 pt-3 bg-background"
         style={{ paddingBottom: insets.bottom + 16 }}
       >
+        {footerHint ? (
+          <Text className="text-text-muted text-sm text-center mb-3">{footerHint}</Text>
+        ) : null}
         <Button label={continueLabel} onPress={onContinue} disabled={continueDisabled} fullWidth size="lg" />
         {showSkip && onSkip ? (
-          <Button label="Skip for now" variant="ghost" onPress={onSkip} fullWidth />
+          <Button label="Skip for now" variant="ghost" onPress={onSkip} fullWidth className="mt-2" />
         ) : null}
       </View>
     </View>

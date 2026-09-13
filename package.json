@@ -14,12 +14,14 @@
     "tracker:dev": "cd tracker_service && python app.py"
   },
   "dependencies": {
+    "@expo-google-fonts/barlow-condensed": "^0.4.1",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/native": "^7.1.8",
     "@supabase/supabase-js": "^2.110.8",
     "expo": "~54.0.35",
     "expo-constants": "~18.0.13",
+    "expo-dev-client": "~6.0.21",
     "expo-file-system": "~19.0.23",
     "expo-font": "~14.0.12",
     "expo-image-picker": "~17.0.11",
@@ -37,9 +39,12 @@
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
+    "react-native-purchases": "^10.9.1",
+    "react-native-purchases-ui": "^10.9.1",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
     "react-native-web": "~0.21.0",
     "react-native-webview": "13.15.0",
     "react-native-worklets": "0.5.1",
@@ -52,7 +57,8 @@
     "babel-preset-expo": "~54.0.10",
     "react-test-renderer": "19.1.0",
     "tailwindcss": "^3.4.19",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "ui-ux-pro-max-cli": "^2.15.0"
   },
   "private": true
 }

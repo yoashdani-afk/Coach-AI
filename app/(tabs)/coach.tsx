@@ -8,6 +8,8 @@ import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { ImproveCategoryGrid } from '@/components/improve/ImproveCategoryGrid';
 import { Button } from '@/components/ui';
 import { getAllImproveCategories } from '@/lib/improveContent';
+import { canAccessWeeklyRegimen, proPaywallHref } from '@/lib/entitlements';
+import { useIsPro } from '@/stores/entitlementStore';
 
 const WEEK_ACCENT = '#FF6B8A';
 
@@ -66,17 +68,21 @@ function CoachSecondaryCard({
   description,
   icon,
   onPress,
+  locked = false,
+  lockHint,
 }: {
   title: string;
   description: string;
   icon: ComponentProps<typeof Ionicons>['name'];
   onPress: () => void;
+  locked?: boolean;
+  lockHint?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={title}
+      accessibilityLabel={locked ? `${title} (Pro)` : title}
       className="rounded-2xl bg-surface border border-border p-4 active:opacity-90"
       style={{ borderLeftWidth: 2, borderLeftColor: '#FF6B8A66' }}
     >
@@ -93,10 +99,23 @@ function CoachSecondaryCard({
           <Ionicons name={icon} size={20} color={WEEK_ACCENT} />
         </View>
         <View className="flex-1 gap-0.5">
-          <Text className="text-text-primary text-base font-semibold">{title}</Text>
-          <Text className="text-text-secondary text-sm leading-5">{description}</Text>
+          <View className="flex-row items-center gap-2 flex-wrap">
+            <Text className="text-text-primary text-base font-semibold">{title}</Text>
+            {locked ? (
+              <View className="px-2 py-0.5 rounded-full bg-primary-muted">
+                <Text className="text-primary text-[10px] font-semibold uppercase">Pro</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text className="text-text-secondary text-sm leading-5">
+            {locked && lockHint ? lockHint : description}
+          </Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={WEEK_ACCENT} />
+        <Ionicons
+          name={locked ? 'lock-closed' : 'chevron-forward'}
+          size={20}
+          color={WEEK_ACCENT}
+        />
       </View>
     </Pressable>
   );
@@ -106,6 +125,16 @@ export default function CoachScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const categories = getAllImproveCategories();
+  const isPro = useIsPro();
+  const canOpenWeek = canAccessWeeklyRegimen(isPro);
+
+  const openWeeklyRegimen = () => {
+    if (!canOpenWeek) {
+      router.push(proPaywallHref('weekly'));
+      return;
+    }
+    router.push('/improve/week');
+  };
 
   return (
     <View className="flex-1 bg-background">
@@ -128,7 +157,9 @@ export default function CoachScreen() {
             title="Weekly training regimen"
             description="Map your week — team, gym, partner, and free time — then get a balanced 7-day plan."
             icon="calendar-outline"
-            onPress={() => router.push('/improve/week')}
+            locked={!canOpenWeek}
+            lockHint="Pro unlocks a balanced 7-day training plan around your matches and recovery."
+            onPress={openWeeklyRegimen}
           />
 
           <View className="mt-4">

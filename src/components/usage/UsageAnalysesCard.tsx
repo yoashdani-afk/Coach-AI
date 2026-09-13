@@ -1,10 +1,15 @@
 import { View, Text } from 'react-native';
 import { Card } from '@/components/ui';
 import { FREE_TIER_ANALYSES_PER_MONTH } from '@/lib/constants';
+import { analysesResetLabel } from '@/lib/analysisCredits';
 
 interface UsageAnalysesCardProps {
   remaining: number;
   unlimited: boolean;
+  /** Monthly cap (free 3 / Pro 12). Defaults to free tier. */
+  limit?: number;
+  /** UTC period end date YYYY-MM-DD from Supabase. */
+  periodEnd?: string | null;
   /**
    * `home` — fuller helper copy (upload uses one analysis / reset messaging).
    * `profile` — quieter secondary view (no CTA-adjacent copy; Home owns that).
@@ -15,30 +20,30 @@ interface UsageAnalysesCardProps {
 export function UsageAnalysesCard({
   remaining,
   unlimited,
+  limit = FREE_TIER_ANALYSES_PER_MONTH,
+  periodEnd = null,
   density = 'home',
 }: UsageAnalysesCardProps) {
-  const limit = FREE_TIER_ANALYSES_PER_MONTH;
   const used = Math.max(0, limit - remaining);
   const progress = unlimited ? 1 : Math.min(1, used / limit);
   const depleted = !unlimited && remaining <= 0;
   const low = !unlimited && remaining === 1;
   const fillColor = depleted ? '#FF3D57' : low ? '#FFB300' : '#00C853';
   const quiet = density === 'profile';
+  const resetHint = analysesResetLabel(periodEnd);
 
   const body = (() => {
     if (unlimited) {
-      return quiet
-        ? 'Unlimited in development builds.'
-        : 'Unlimited in development builds.';
+      return 'Unlimited in development builds.';
     }
     if (depleted) {
       return quiet
-        ? `You’ve used all ${limit} free analyses this month.`
-        : `You’ve used all ${limit} free analyses. Limits reset next month — or upgrade when available.`;
+        ? `You’ve used all ${limit} analyses this month.`
+        : `You’ve used all ${limit} analyses this month. ${resetHint}`;
     }
     return quiet
-      ? `${remaining} of ${limit} left this month.`
-      : `${remaining} of ${limit} left this month. Each upload uses one analysis.`;
+      ? `${remaining} of ${limit} left this month. ${resetHint}`
+      : `${remaining} of ${limit} left this month. Each upload uses one analysis. ${resetHint}`;
   })();
 
   return (
@@ -53,7 +58,7 @@ export function UsageAnalysesCard({
       <View className="flex-row items-start justify-between gap-3">
         <View className="flex-1 gap-1">
           <Text className="text-text-primary font-semibold text-base">
-            {depleted ? 'Monthly limit reached' : 'Free analyses'}
+            {depleted ? 'Monthly limit reached' : 'Analyses this month'}
           </Text>
           <Text className="text-text-secondary text-sm leading-5">{body}</Text>
         </View>

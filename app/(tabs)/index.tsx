@@ -1,18 +1,19 @@
-import { ScrollView, View, Text } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { Card } from '@/components/ui';
 import {
+  HomeBrandBar,
+  HomeEmptyReports,
   HomeHallOfFameCard,
-  HomeHowItWorksCard,
+  HomeHowItWorksController,
+  HomeIdentityUsageCard,
   HomeLatestReportCard,
+  HomeSectionEnter,
   HomeTrainingFocusCard,
   HomeUploadHero,
-  HomeUsageCard,
 } from '@/components/home/HomeSections';
 import { getTimeGreeting } from '@/lib/format';
-import { EXAMPLE_ANALYSIS } from '@/lib/mockData';
 import {
   labelForGoal,
   labelForLevel,
@@ -21,117 +22,144 @@ import {
 import { getLatestReport, useAnalysisStore } from '@/stores/analysisStore';
 import { getRemainingAnalyses, useProfileStore } from '@/stores/profileStore';
 import { isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
+import { getAnalysisLimit, proPaywallHref } from '@/lib/entitlements';
+import { useIsPro } from '@/stores/entitlementStore';
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
   const profile = useProfileStore((s) => s.profile);
+  const isPro = useIsPro();
+  const analysesMonthlyLimit = useProfileStore((s) => s.analysesMonthlyLimit);
+  const effectiveLimit = Math.max(analysesMonthlyLimit, getAnalysisLimit(isPro));
   const reports = useAnalysisStore((s) => s.reports);
-  const remaining = getRemainingAnalyses(profile);
+  const remaining = getRemainingAnalyses(profile, effectiveLimit);
   const latestReport = getLatestReport(reports);
   const hasRealAnalyses = reports.length > 0;
   const unlimited = isDevUnlimitedAnalyses();
+  const analysesDepleted = !unlimited && remaining <= 0;
 
   const firstName = profile?.firstName ?? 'Player';
   const positionLabel = profile ? labelForPosition(profile.mainPosition) : '';
   const levelLabel = profile ? labelForLevel(profile.playingLevel) : '';
   const trainingFocus = profile?.improvementGoals.slice(0, 2) ?? [];
   const trainingFocusLabels = trainingFocus.map((g) => labelForGoal(g));
+  const identityLine = profile
+    ? `${positionLabel} · ${levelLabel}`
+    : 'Keep building. Keep competing.';
 
   const handleUpload = () => {
-    if (!unlimited && remaining <= 0) return;
+    if (analysesDepleted) {
+      router.push(proPaywallHref('analyses'));
+      return;
+    }
     router.push('/(upload)');
+  };
+
+  let section = 0;
+  const next = () => {
+    const i = section;
+    section += 1;
+    return i;
   };
 
   return (
     <View className="flex-1 bg-background">
       <ScrollView
-        contentContainerStyle={{ paddingTop: 16, paddingBottom: insets.bottom + 24 }}
+        contentContainerStyle={{
+          paddingTop: 8,
+          paddingBottom: insets.bottom + 28,
+        }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="px-4 gap-5">
-          <View>
-            <Text className="text-text-secondary text-base">{getTimeGreeting()},</Text>
-            <Text className="text-text-primary text-3xl font-bold">{firstName}</Text>
-            {profile ? (
-              <Text className="text-text-muted text-sm mt-1">
-                Playing as {positionLabel} · {levelLabel}
-              </Text>
-            ) : null}
-          </View>
+        <View className="px-4 gap-3.5">
+          <HomeSectionEnter index={next()}>
+            <HomeBrandBar onInfoPress={() => setHowItWorksOpen(true)} />
+          </HomeSectionEnter>
 
-          <HomeUploadHero
-            onPress={handleUpload}
-            disabled={!unlimited && remaining <= 0}
-          />
+          <HomeSectionEnter index={next()}>
+            <HomeIdentityUsageCard
+              greeting={getTimeGreeting()}
+              firstName={firstName}
+              subtitle={identityLine}
+              remaining={remaining}
+              unlimited={unlimited}
+              limit={effectiveLimit}
+              periodEnd={profile?.analysesPeriodEnd}
+            />
+          </HomeSectionEnter>
 
-          {!unlimited && remaining <= 0 ? (
-            <Text className="text-text-muted text-sm text-center -mt-2">
-              No analyses left this month. Come back when your limit resets to upload again.
-            </Text>
-          ) : null}
+          <HomeSectionEnter index={next()}>
+            <HomeUploadHero onPress={handleUpload} depleted={analysesDepleted} />
+          </HomeSectionEnter>
 
-          <HomeUsageCard remaining={remaining} unlimited={unlimited} />
-
-          <HomeHallOfFameCard onPress={() => router.push('/(tabs)/hall-of-fame')} />
-
-          <HomeHowItWorksCard />
-
-          <HomeTrainingFocusCard
-            goalLabels={trainingFocusLabels}
-            onEditGoals={() => router.push('/(tabs)/profile')}
-          />
-
-          <View>
-            <View className="flex-row items-center justify-between mb-3 px-1">
-              <Text className="text-text-muted text-xs uppercase tracking-wider">
-                {hasRealAnalyses ? 'Latest coaching report' : 'What your reports look like'}
-              </Text>
-              {hasRealAnalyses ? (
-                <Text
-                  onPress={() => router.push('/reports/history')}
-                  className="text-primary text-xs font-medium"
-                >
-                  View all
+          <HomeSectionEnter index={next()}>
+            <View className="gap-2.5">
+              <View className="flex-row items-center justify-between px-0.5">
+                <Text className="text-text-primary text-[17px] font-bold tracking-tight">
+                  Explore insights
                 </Text>
-              ) : null}
+                <Pressable
+                  onPress={() => router.push('/(tabs)/progress')}
+                  hitSlop={8}
+                  className="active:opacity-70"
+                >
+                  <Text style={{ color: '#00C853', fontSize: 13, fontWeight: '600' }}>
+                    View all ›
+                  </Text>
+                </Pressable>
+              </View>
+              <View className="flex-row gap-3" style={{ minHeight: 168 }}>
+                <HomeHallOfFameCard onPress={() => router.push('/(tabs)/hall-of-fame')} />
+                <HomeTrainingFocusCard
+                  goalLabels={trainingFocusLabels}
+                  onEditGoals={() => router.push('/(tabs)/profile')}
+                />
+              </View>
             </View>
+          </HomeSectionEnter>
 
-            {latestReport ? (
-              <HomeLatestReportCard
-                report={latestReport}
-                onPress={() => router.push(`/report/${latestReport.id}`)}
-              />
-            ) : (
-              <>
-                <Card variant="outlined" className="gap-3 mb-3">
-                  <View className="flex-row items-center gap-2 flex-wrap">
-                    <Text className="text-text-primary font-semibold">{EXAMPLE_ANALYSIS.title}</Text>
-                    <View className="bg-surface-elevated px-2 py-0.5 rounded">
-                      <Text className="text-text-muted text-[10px] uppercase">Example</Text>
-                    </View>
-                  </View>
-                  <Text className="text-text-muted text-sm">{EXAMPLE_ANALYSIS.dateLabel}</Text>
-                  <Text className="text-text-secondary text-sm leading-5">
-                    {EXAMPLE_ANALYSIS.summary}
-                  </Text>
-                  <Text className="text-text-muted text-xs leading-5">
-                    Example only — upload a clip to get your own.
-                  </Text>
-                </Card>
+          <HomeSectionEnter index={next()}>
+            <View className="gap-2.5">
+              <View className="flex-row items-center justify-between px-0.5">
+                <Text className="text-text-primary text-[17px] font-bold tracking-tight">
+                  Latest report
+                </Text>
+                {hasRealAnalyses ? (
+                  <Pressable
+                    onPress={() =>
+                      latestReport
+                        ? router.push(`/report/${latestReport.id}`)
+                        : router.push('/reports/history')
+                    }
+                    hitSlop={8}
+                    className="active:opacity-70"
+                  >
+                    <Text style={{ color: '#00C853', fontSize: 13, fontWeight: '600' }}>
+                      View full report ›
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
 
-                <Card variant="default" className="items-center py-8 gap-2">
-                  <Ionicons name="videocam-outline" size={32} color="#6B6B73" />
-                  <Text className="text-text-primary font-medium text-center">No reports yet</Text>
-                  <Text className="text-text-secondary text-sm text-center px-4 leading-5">
-                    Upload a clip above to generate your first coaching report. It’ll show up here.
-                  </Text>
-                </Card>
-              </>
-            )}
-          </View>
+              {latestReport ? (
+                <HomeLatestReportCard
+                  report={latestReport}
+                  onPress={() => router.push(`/report/${latestReport.id}`)}
+                />
+              ) : (
+                <HomeEmptyReports onUpload={handleUpload} />
+              )}
+            </View>
+          </HomeSectionEnter>
         </View>
       </ScrollView>
+
+      <HomeHowItWorksController
+        open={howItWorksOpen}
+        onClose={() => setHowItWorksOpen(false)}
+      />
     </View>
   );
 }

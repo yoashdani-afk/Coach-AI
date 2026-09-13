@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,9 @@ import {
   listPrioritySkillOptions,
   previewWeekRoles,
 } from '@/lib/improveWeekOrchestrator';
+import { canAccessWeeklyRegimen, proPaywallHref } from '@/lib/entitlements';
 import { useImproveWeekDraftStore } from '@/stores/improveWeekDraftStore';
+import { useIsPro } from '@/stores/entitlementStore';
 import { useProfileStore } from '@/stores/profileStore';
 import {
   WEEK_DAY_LABELS,
@@ -115,6 +117,14 @@ function RolePreviewRow({
 export default function ImproveWeekWizardScreen() {
   const router = useRouter();
   const profile = useProfileStore((s) => s.profile);
+  const isPro = useIsPro();
+  const canOpenWeek = canAccessWeeklyRegimen(isPro);
+
+  useEffect(() => {
+    if (!canOpenWeek) {
+      router.replace(proPaywallHref('weekly'));
+    }
+  }, [canOpenWeek, router]);
 
   const draft = useImproveWeekDraftStore((s) => s.draft);
   const setWeekSituation = useImproveWeekDraftStore((s) => s.setWeekSituation);

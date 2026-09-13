@@ -1,26 +1,56 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import type { PlayerProfile } from '@/types/profile';
 import { FREE_TIER_ANALYSES_PER_MONTH } from '@/lib/constants';
 import { isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
+import { getAnalysisLimit } from '@/lib/entitlements';
+import {
+  consumeAnalysisCreditRemote,
+  fetchAnalysisUsage,
+  type AnalysisUsageSnapshot,
+} from '@/lib/analysisUsageRemote';
 import { createAppJSONStorage } from '@/lib/appStorage';
 import { useAnalysisCreditsStore } from '@/stores/analysisCreditsStore';
+import { useAuthStore } from '@/stores/authStore';
 import { migrateStoredProfile } from '@/lib/profileUtils';
+import type { PlayerProfile } from '@/types/profile';
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface ProfileState {
   hasSeenOnboarding: boolean;
   isSignedIn: boolean;
   profile: PlayerProfile | null;
+  /** Last known remote monthly limit used for sync (free or Pro). */
+  analysesMonthlyLimit: number;
   hasHydrated: boolean;
   setHasSeenOnboarding: (value: boolean) => void;
   setSignedIn: (value: boolean) => void;
   setProfile: (profile: PlayerProfile) => void;
-  /** Consume one free credit for a successful Gemini analysis (production only). */
-  consumeAnalysisCreditForAttempt: (attemptId: string) => boolean;
+  applyAnalysisUsage: (usage: AnalysisUsageSnapshot) => void;
+  /** Pull usage from Supabase for the signed-in account. */
+  refreshAnalysisUsage: (monthlyLimit?: number) => Promise<AnalysisUsageSnapshot | null>;
+  /**
+   * Consume one analysis credit for a successful Gemini analysis.
+   * Production: Supabase RPC (account-scoped). Dev: no-op / unlimited.
+   */
+  consumeAnalysisCreditForAttempt: (
+    attemptId: string,
+    monthlyLimit?: number
+  ) => Promise<boolean>;
   resetFreeAnalyses: () => void;
   clearProfile: () => void;
   resetAll: () => void;
   setHasHydrated: (value: boolean) => void;
+}
+
+function withUsageFields(
+  profile: PlayerProfile,
+  usage: AnalysisUsageSnapshot
+): PlayerProfile {
+  return {
+    ...profile,
+    analysesUsedThisMonth: usage.used,
+    analysesPeriodEnd: usage.periodEnd || null,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export const useProfileStore = create<ProfileState>()(
@@ -29,12 +59,40 @@ export const useProfileStore = create<ProfileState>()(
       hasSeenOnboarding: false,
       isSignedIn: false,
       profile: null,
+      analysesMonthlyLimit: FREE_TIER_ANALYSES_PER_MONTH,
       hasHydrated: false,
       setHasSeenOnboarding: (value) => set({ hasSeenOnboarding: value }),
       setSignedIn: (value) => set({ isSignedIn: value }),
       setProfile: (profile) => set({ profile, isSignedIn: true }),
 
-      consumeAnalysisCreditForAttempt: (attemptId) => {
+      applyAnalysisUsage: (usage) => {
+        const profile = get().profile;
+        if (!profile) {
+          set({ analysesMonthlyLimit: usage.limit });
+          return;
+        }
+        set({
+          profile: withUsageFields(profile, usage),
+          analysesMonthlyLimit: usage.limit,
+        });
+      },
+
+      refreshAnalysisUsage: async (monthlyLimit) => {
+        if (isDevUnlimitedAnalyses()) {
+          return null;
+        }
+        if (!useAuthStore.getState().session) {
+          return null;
+        }
+        const limit = monthlyLimit ?? get().analysesMonthlyLimit ?? getAnalysisLimit(false);
+        const usage = await fetchAnalysisUsage(limit);
+        if (usage) {
+          get().applyAnalysisUsage(usage);
+        }
+        return usage;
+      },
+
+      consumeAnalysisCreditForAttempt: async (attemptId, monthlyLimit) => {
         if (isDevUnlimitedAnalyses()) {
           console.log('[Credits] Dev mode — skipping credit consumption', { attemptId });
           return false;
@@ -46,31 +104,32 @@ export const useProfileStore = create<ProfileState>()(
           return false;
         }
 
-        const profile = get().profile;
-        if (!profile) return false;
+        if (!useAuthStore.getState().session) {
+          console.warn('[Credits] No session — cannot charge analysis credit', { attemptId });
+          return false;
+        }
 
-        if (profile.analysesUsedThisMonth >= FREE_TIER_ANALYSES_PER_MONTH) {
-          console.warn('[Credits] No free analyses remaining', { attemptId });
+        const limit = monthlyLimit ?? get().analysesMonthlyLimit ?? getAnalysisLimit(false);
+        const result = await consumeAnalysisCreditRemote(attemptId, limit);
+
+        if (!result.ok) {
+          console.warn('[Credits] Remote consume failed', result);
+          if (result.usage) {
+            get().applyAnalysisUsage(result.usage);
+          }
           return false;
         }
 
         credits.markAttemptConsumed(attemptId);
-        set({
-          profile: {
-            ...profile,
-            analysesUsedThisMonth: Math.min(
-              FREE_TIER_ANALYSES_PER_MONTH,
-              profile.analysesUsedThisMonth + 1
-            ),
-            updatedAt: new Date().toISOString(),
-          },
-        });
+        get().applyAnalysisUsage(result.usage);
 
-        console.log('[Credits] Consumed one free analysis', {
+        console.log('[Credits] Consumed analysis credit (remote)', {
           attemptId,
-          used: get().profile?.analysesUsedThisMonth,
+          duplicate: result.duplicate,
+          used: result.usage.used,
+          remaining: result.usage.remaining,
         });
-        return true;
+        return !result.duplicate;
       },
 
       resetFreeAnalyses: () => {
@@ -85,7 +144,9 @@ export const useProfileStore = create<ProfileState>()(
           },
         });
         useAnalysisCreditsStore.getState().resetConsumedAttempts();
-        console.log('[Credits] Free analyses reset to', FREE_TIER_ANALYSES_PER_MONTH);
+        console.log(
+          '[Credits] Local analyses counter reset (dev). Remote usage is unchanged — wait for month rollover or SQL reset.'
+        );
       },
 
       clearProfile: () => set({ profile: null }),
@@ -94,6 +155,7 @@ export const useProfileStore = create<ProfileState>()(
           hasSeenOnboarding: false,
           isSignedIn: false,
           profile: null,
+          analysesMonthlyLimit: FREE_TIER_ANALYSES_PER_MONTH,
         }),
       setHasHydrated: (value) => set({ hasHydrated: value }),
     }),
@@ -104,6 +166,7 @@ export const useProfileStore = create<ProfileState>()(
         hasSeenOnboarding: state.hasSeenOnboarding,
         isSignedIn: state.isSignedIn,
         profile: state.profile,
+        analysesMonthlyLimit: state.analysesMonthlyLimit,
       }),
       onRehydrateStorage: () => (state, error) => {
         if (typeof window === 'undefined') return;
@@ -124,7 +187,15 @@ export const useProfileStore = create<ProfileState>()(
   )
 );
 
-export { getRemainingAnalyses, canStartAnalysis, remainingAnalysesLabel, isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
+export {
+  getRemainingAnalyses,
+  canStartAnalysis,
+  remainingAnalysesLabel,
+  isDevUnlimitedAnalyses,
+  analysesResetLabel,
+} from '@/lib/analysisCredits';
+
+export { getAnalysisLimit } from '@/lib/entitlements';
 
 export function hasCompleteProfile(profile: PlayerProfile | null): boolean {
   return profile?.isComplete === true;

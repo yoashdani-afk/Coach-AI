@@ -3,6 +3,7 @@ import type { GoalAward, GoalAwardType, GoalSubmission } from '@/types/hallOfFam
 import type { Position } from '@/types/profile';
 import type { ScoredCategory } from '@/types/analysis';
 import { normalizeUserSubmission } from '@/lib/hallOfFame/demoData';
+import type { PublicGoalReportSnapshot } from '@/lib/hallOfFame/reportSnapshot';
 
 export const HALL_OF_FAME_BUCKET = 'hall-of-fame';
 
@@ -29,6 +30,8 @@ export interface HallOfFameEntryRow {
   submitted_at: string;
   source: 'user' | 'demo';
   auto_inducted: boolean;
+  /** Full public Goal report; null on legacy rows inducted before this column. */
+  report_snapshot: PublicGoalReportSnapshot | null;
 }
 
 export function publicVideoUrl(supabaseUrl: string, videoPath: string): string {
@@ -76,8 +79,9 @@ export function submissionToInsertRow(params: {
   userId: string;
   submission: GoalSubmission;
   videoPath: string;
+  reportSnapshot?: PublicGoalReportSnapshot | null;
 }): Omit<HallOfFameEntryRow, 'submitted_at'> & { submitted_at?: string } {
-  const { id, userId, submission, videoPath } = params;
+  const { id, userId, submission, videoPath, reportSnapshot = null } = params;
   const award: GoalAward = submission.award;
 
   return {
@@ -102,5 +106,6 @@ export function submissionToInsertRow(params: {
     source: submission.source,
     auto_inducted: Boolean(submission.autoInducted),
     submitted_at: submission.submittedAt,
+    report_snapshot: reportSnapshot,
   };
 }

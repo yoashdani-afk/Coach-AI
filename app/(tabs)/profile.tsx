@@ -7,7 +7,6 @@ import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { Card, Chip, Button } from '@/components/ui';
 import { UsageAnalysesCard } from '@/components/usage/UsageAnalysesCard';
 import {
-  FREE_TIER_ANALYSES_PER_MONTH,
   labelForClubLevel,
   labelForFeedbackArea,
   labelForFoot,
@@ -21,9 +20,12 @@ import {
   formatWeightForDisplay,
 } from '@/lib/profileUtils';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { logOutRevenueCatUser } from '@/lib/revenueCat';
 import { useAuthStore } from '@/stores/authStore';
+import { useEntitlementStore, useIsPro } from '@/stores/entitlementStore';
 import { useProfileStore, profileNeedsCompletion } from '@/stores/profileStore';
 import { getRemainingAnalyses, isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
+import { getAnalysisLimit } from '@/lib/entitlements';
 
 const PRIMARY_GREEN = '#00C853';
 const FOCUS_BLUE = '#5B8DEF';
@@ -137,15 +139,18 @@ export default function ProfileScreen() {
   const clearProfile = useProfileStore((s) => s.clearProfile);
   const setSignedIn = useProfileStore((s) => s.setSignedIn);
   const resetFreeAnalyses = useProfileStore((s) => s.resetFreeAnalyses);
+  const analysesMonthlyLimit = useProfileStore((s) => s.analysesMonthlyLimit);
+  const isPro = useIsPro();
+  const effectiveLimit = Math.max(analysesMonthlyLimit, getAnalysisLimit(isPro));
   const clearAuth = useAuthStore((s) => s.clear);
-  const remaining = getRemainingAnalyses(profile);
+  const remaining = getRemainingAnalyses(profile, effectiveLimit);
   const unlimited = isDevUnlimitedAnalyses();
   const needsCompletion = profileNeedsCompletion(profile);
 
   const handleResetFreeAnalyses = () => {
     Alert.alert(
       'Reset free analyses',
-      `Restore your remaining free analyses to ${FREE_TIER_ANALYSES_PER_MONTH}. Development only.`,
+      `Local counter only (dev). Remote Supabase usage is unchanged. Limit shown: ${analysesMonthlyLimit}/month.`,
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Reset', onPress: () => resetFreeAnalyses() },
@@ -180,6 +185,8 @@ export default function ProfileScreen() {
           return;
         }
       }
+      await logOutRevenueCatUser();
+      useEntitlementStore.getState().setHasProEntitlement(false);
       clearAuth();
       clearProfile();
       setSignedIn(false);
@@ -304,7 +311,13 @@ export default function ProfileScreen() {
           </View>
         </Card>
 
-        <UsageAnalysesCard remaining={remaining} unlimited={unlimited} density="profile" />
+        <UsageAnalysesCard
+          remaining={remaining}
+          unlimited={unlimited}
+          limit={effectiveLimit}
+          periodEnd={profile?.analysesPeriodEnd}
+          density="profile"
+        />
 
         <ProfileSectionCard title="About" icon="globe-outline" accent={FOCUS_BLUE}>
           <ProfileRow

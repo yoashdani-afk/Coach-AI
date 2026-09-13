@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
+import { getHofLimit, isDevForcePro, FREE_HOF_ENTRY_LIMIT } from '@/lib/entitlements';
 import type {
   Challenge,
   GoalSubmission,
@@ -18,7 +19,9 @@ import {
   validateSubmissionDuplicate,
 } from '@/lib/hallOfFame/submissionMapper';
 import { deriveHallOfFamePlayTitle } from '@/lib/hallOfFame/playTitle';
+import { buildPublicGoalReportSnapshot } from '@/lib/hallOfFame/reportSnapshot';
 import {
+  publicVideoUrl,
   rowToGoalSubmission,
   submissionToInsertRow,
   type HallOfFameEntryRow,
@@ -26,14 +29,20 @@ import {
 import { uploadHallOfFameVideo } from '@/lib/hallOfFame/uploadVideo';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
+import { useEntitlementStore } from '@/stores/entitlementStore';
 import type { CoachingReport } from '@/types/analysis';
 import type { PlayerProfile } from '@/types/profile';
 
-/**
- * Non-premium: exactly one Hall of Fame entry per user.
- * FUTURE PREMIUM: raise limit / allow replace when entitlement grants more slots.
- */
-export const MAX_USER_HALL_OF_FAME_ENTRIES_NON_PREMIUM = 1;
+/** @deprecated Prefer getHofLimit(isPro) — kept for existing imports. */
+export const MAX_USER_HALL_OF_FAME_ENTRIES_NON_PREMIUM = FREE_HOF_ENTRY_LIMIT;
+
+function currentIsPro(): boolean {
+  return useEntitlementStore.getState().hasProEntitlement || isDevForcePro();
+}
+
+function currentHofLimit(): number {
+  return getHofLimit(currentIsPro());
+}
 
 /** Display cap for Global Leaderboard — only top N by score are shown. */
 export const GLOBAL_LEADERBOARD_DISPLAY_LIMIT = 100;
@@ -168,7 +177,7 @@ export const useHallOfFameStore = create<HallOfFameState>((set, get) => ({
 
   hasReachedUserEntryLimit: () => {
     if (isDevUnlimitedAnalyses()) return false;
-    return get().userSubmissions.length >= MAX_USER_HALL_OF_FAME_ENTRIES_NON_PREMIUM;
+    return get().userSubmissions.length >= currentHofLimit();
   },
 
   evaluateForHallOfFame: (report) => {
@@ -183,7 +192,8 @@ export const useHallOfFameStore = create<HallOfFameState>((set, get) => ({
     if (get().hasReachedUserEntryLimit()) {
       console.log('[HallOfFame] Eligible Goal report ignored — user entry limit reached', {
         reportId: report.id,
-        limit: MAX_USER_HALL_OF_FAME_ENTRIES_NON_PREMIUM,
+        limit: currentHofLimit(),
+        isPro: currentIsPro(),
       });
       return null;
     }
@@ -256,11 +266,18 @@ export const useHallOfFameStore = create<HallOfFameState>((set, get) => ({
         localUri: report.clip.uri,
       });
 
+      const clipPublicUrl = publicVideoUrl(SUPABASE_URL, path);
+      const reportSnapshot =
+        report.mode === 'GOAL'
+          ? buildPublicGoalReportSnapshot(report, clipPublicUrl)
+          : null;
+
       const row = submissionToInsertRow({
         id: entryId,
         userId,
         submission: draft,
         videoPath: path,
+        reportSnapshot,
       });
 
       const { data, error } = await getSupabase()

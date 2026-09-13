@@ -78,6 +78,11 @@ export function ReportDetailView({ report, bottomPadding = 24, footer }: ReportD
       {report.mode === 'PERFORMANCE' ? <PerformanceSections report={report} /> : null}
       {report.mode === 'GOAL' ? <GoalSections report={report} /> : null}
 
+      <Text className="text-text-muted text-xs leading-5 px-1">
+        AI analysis is generated automatically and may occasionally misread fast or unclear
+        footage.
+      </Text>
+
       {footer}
     </ScrollView>
   );

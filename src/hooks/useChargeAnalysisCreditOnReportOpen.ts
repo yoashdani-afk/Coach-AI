@@ -1,16 +1,19 @@
 import { useEffect, useRef } from 'react';
 import type { CoachingReport } from '@/types/analysis';
+import { getAnalysisLimit } from '@/lib/entitlements';
+import { useIsPro } from '@/stores/entitlementStore';
 import { useProfileStore } from '@/stores/profileStore';
 import { useUploadStore } from '@/stores/uploadStore';
 
 /**
- * Consumes one free analysis credit when a Gemini report screen opens successfully.
- * Skips demo fallbacks, duplicates, and dev builds.
+ * Consumes one analysis credit when a Gemini report screen opens successfully.
+ * Skips demo fallbacks, duplicates, and dev builds. Charges via Supabase RPC.
  */
 export function useChargeAnalysisCreditOnReportOpen(report: CoachingReport | null): void {
   const pendingBillableAnalysis = useUploadStore((s) => s.pendingBillableAnalysis);
   const clearPendingBillableAnalysis = useUploadStore((s) => s.clearPendingBillableAnalysis);
   const consumeAnalysisCreditForAttempt = useProfileStore((s) => s.consumeAnalysisCreditForAttempt);
+  const isPro = useIsPro();
   const chargedRef = useRef(false);
 
   useEffect(() => {
@@ -27,12 +30,16 @@ export function useChargeAnalysisCreditOnReportOpen(report: CoachingReport | nul
     }
 
     chargedRef.current = true;
-    consumeAnalysisCreditForAttempt(pending.attemptId);
-    clearPendingBillableAnalysis();
+    const monthlyLimit = getAnalysisLimit(isPro);
+    void (async () => {
+      await consumeAnalysisCreditForAttempt(pending.attemptId, monthlyLimit);
+      clearPendingBillableAnalysis();
+    })();
   }, [
     report,
     pendingBillableAnalysis,
     consumeAnalysisCreditForAttempt,
     clearPendingBillableAnalysis,
+    isPro,
   ]);
 }

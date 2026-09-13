@@ -217,6 +217,8 @@ export function migrateStoredProfile(raw: unknown): PlayerProfile | null {
     feedbackAreas,
     isComplete: false,
     analysesUsedThisMonth: asNumber(obj.analysesUsedThisMonth) ?? 0,
+    analysesPeriodEnd:
+      typeof obj.analysesPeriodEnd === 'string' ? obj.analysesPeriodEnd : null,
     updatedAt: asString(obj.updatedAt) || new Date().toISOString(),
   };
 

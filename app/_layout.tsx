@@ -6,11 +6,24 @@ import { View, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DevPreviewBanner } from '@/components/layout/DevPreviewBanner';
+import { getAnalysisLimit, isDevForcePro } from '@/lib/entitlements';
+import {
+  configureRevenueCat,
+  identifyRevenueCatUser,
+  logOutRevenueCatUser,
+} from '@/lib/revenueCat';
 import { isDevPreviewMode, isSupabaseConfigured, supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/authStore';
+import { useEntitlementStore } from '@/stores/entitlementStore';
 import { useProfileStore, hasCompleteProfile } from '@/stores/profileStore';
 import { useAnalysisStore } from '@/stores/analysisStore';
 import { useAnalysisCreditsStore } from '@/stores/analysisCreditsStore';
+
+function refreshUsageForSession(): void {
+  const isPro =
+    useEntitlementStore.getState().hasProEntitlement || isDevForcePro();
+  void useProfileStore.getState().refreshAnalysisUsage(getAnalysisLimit(isPro));
+}
 
 function useProtectedRoute() {
   const { session, isLoading } = useAuthStore();
@@ -59,6 +72,10 @@ export default function RootLayout() {
   }, [hasHydrated, creditsHydrated, devCreditsMigrationDone]);
 
   useEffect(() => {
+    void configureRevenueCat();
+  }, []);
+
+  useEffect(() => {
     if (isDevPreviewMode || !isSupabaseConfigured || !supabase) {
       setLoading(false);
       return;
@@ -66,16 +83,34 @@ export default function RootLayout() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session?.user?.id) {
+        void identifyRevenueCatUser(session.user.id);
+        refreshUsageForSession();
+      }
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session?.user?.id) {
+        void identifyRevenueCatUser(session.user.id);
+        refreshUsageForSession();
+      } else {
+        void logOutRevenueCatUser();
+      }
     });
 
     return () => subscription.unsubscribe();
   }, [setSession, setLoading]);
+
+  useEffect(() => {
+    if (!hasHydrated || isDevPreviewMode) return;
+    const session = useAuthStore.getState().session;
+    if (session) {
+      refreshUsageForSession();
+    }
+  }, [hasHydrated]);
 
   if (isLoading || !hasHydrated || !creditsHydrated) {
     return (
@@ -97,6 +132,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="(upload)" />
           <Stack.Screen name="hall-of-fame/index" />
+          <Stack.Screen name="hall-of-fame/[entryId]" />
+          <Stack.Screen name="pro" />
           <Stack.Screen name="report/[id]" />
           <Stack.Screen name="reports/history" />
           <Stack.Screen name="improve/session/index" />

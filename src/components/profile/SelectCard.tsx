@@ -66,17 +66,18 @@ export function SelectGridItem({ children }: { children: React.ReactNode }) {
 interface SetupProgressProps {
   step: number;
   total: number;
+  compact?: boolean;
 }
 
-export function SetupProgress({ step, total }: SetupProgressProps) {
+export function SetupProgress({ step, total, compact = false }: SetupProgressProps) {
   const pct = Math.round((step / total) * 100);
   return (
-    <View className="mb-6">
-      <View className="flex-row justify-between mb-2">
-        <Text className="text-text-muted text-sm">Step {step} of {total}</Text>
-        <Text className="text-text-muted text-sm">{pct}%</Text>
+    <View className={compact ? '' : 'mb-6'}>
+      <View className={`flex-row justify-between ${compact ? 'mb-1.5' : 'mb-2'}`}>
+        <Text className="text-text-muted text-xs">Step {step} of {total}</Text>
+        <Text className="text-text-muted text-xs">{pct}%</Text>
       </View>
-      <View className="h-1.5 bg-surface-elevated rounded-full overflow-hidden">
+      <View className={`${compact ? 'h-1' : 'h-1.5'} bg-surface-elevated rounded-full overflow-hidden`}>
         <View className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
       </View>
     </View>
