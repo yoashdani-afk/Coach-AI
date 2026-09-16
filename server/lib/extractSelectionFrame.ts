@@ -1,14 +1,12 @@
 import { spawn } from 'node:child_process';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import sharp from 'sharp';
+import { FFMPEG_PATH } from './ffmpegPath.js';
 import {
   orientationFromSize,
   probeVideoOrientationPlan,
   type CanonicalRotation,
   type VideoOrientation,
 } from './videoOrientation.js';
-
-const FFMPEG_PATH = ffmpegInstaller.path;
 
 export type SelectionFrameOrientation = VideoOrientation;
 

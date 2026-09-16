@@ -1,12 +1,11 @@
 import { spawn } from 'node:child_process';
 import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import sharp from 'sharp';
+import { FFMPEG_PATH } from './ffmpegPath.js';
 import type { DenseFrame, DenseFrameExtractionResult } from './factualEventTypes.js';
 import { orientationFromSize } from './videoOrientation.js';
 
-const FFMPEG_PATH = ffmpegInstaller.path;
 export const DENSE_FRAME_FPS = 5;
 const MAX_FRAME_WIDTH = 960;
 const JPEG_QUALITY = 82;

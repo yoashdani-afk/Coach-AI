@@ -1,15 +1,13 @@
 import { spawn } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import sharp from 'sharp';
+import { FFMPEG_PATH } from './ffmpegPath.js';
 import {
   mapNormalizedTapToPixels,
   orientationFromSize,
 } from './videoOrientation.js';
 import type { PlayerSelection } from './types.js';
 import { getFocusTimestampSec } from './videoWindow.js';
-
-const FFMPEG_PATH = ffmpegInstaller.path;
 
 export interface PlayerGroundingFramesResult {
   success: boolean;

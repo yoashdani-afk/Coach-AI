@@ -3,10 +3,9 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import { FFMPEG_PATH } from '../ffmpegPath.js';
 import type { ExtractedFrame } from './types.js';
 
-const FFMPEG_PATH = ffmpegInstaller.path;
 /** Inference frame width — keeps decode + detect fast while preserving aspect ratio. */
 export const INFERENCE_MAX_WIDTH = 480;
 export const PASS1_FPS = 7;

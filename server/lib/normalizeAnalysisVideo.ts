@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { copyFile } from 'node:fs/promises';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import { FFMPEG_PATH } from './ffmpegPath.js';
 import {
   orientationFromSize,
   probeVideoOrientationPlan,
@@ -8,8 +8,6 @@ import {
   type CanonicalRotation,
   type VideoOrientation,
 } from './videoOrientation.js';
-
-const FFMPEG_PATH = ffmpegInstaller.path;
 
 export interface NormalizedAnalysisVideo {
   normalizedAnalysisVideoPath: string;

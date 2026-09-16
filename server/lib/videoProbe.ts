@@ -1,7 +1,5 @@
 import { spawn } from 'node:child_process';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
-
-const FFMPEG_PATH = ffmpegInstaller.path;
+import { FFMPEG_PATH } from './ffmpegPath.js';
 
 export type VideoRotation = 0 | 90 | 180 | 270;
 

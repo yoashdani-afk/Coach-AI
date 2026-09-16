@@ -1,8 +1,7 @@
 import { spawn } from 'node:child_process';
 import { open, stat } from 'node:fs/promises';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+import { FFMPEG_PATH } from './ffmpegPath.js';
 
-const FFMPEG_PATH = ffmpegInstaller.path;
 const MP4_PROBE_BYTES = 512 * 1024;
 const FIXED_ONE = 65536;
 export const STRONG_PORTRAIT_ASPECT_RATIO = 1.5;
