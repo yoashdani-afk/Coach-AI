@@ -4,6 +4,7 @@ import path from 'node:path';
 import { GoogleGenAI } from '@google/genai';
 import { generateCoachingFromTimeline } from './generateCoachingFromTimeline.js';
 import { extractDenseFrames } from './denseFrameExtraction.js';
+import { resolveGeminiApiKey } from './geminiApiKey.js';
 import { normalizeAnalysisVideo } from './normalizeAnalysisVideo.js';
 import {
   extractPlayerGroundingFrames,
@@ -40,8 +41,8 @@ import type {
 const MAX_MODEL_ATTEMPTS = 8;
 
 function getApiKey(): string {
-  const key = process.env.GEMINI_API_KEY?.trim();
-  if (!key || key === 'PASTE_KEY_HERE') {
+  const key = resolveGeminiApiKey(process.env.GEMINI_API_KEY);
+  if (!key) {
     throw new ServerAnalysisError('GEMINI_API_KEY is not set on the server', 'MISSING_API_KEY');
   }
   return key;

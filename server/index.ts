@@ -15,6 +15,7 @@ import {
 import { handleDebugPlayerFrame } from './api/debug-player-frame.js';
 import { handleVideoFrame } from './api/video-frame.js';
 import { FFMPEG_PATH } from './lib/ffmpegPath.js';
+import { resolveGeminiApiKey } from './lib/geminiApiKey.js';
 import { GEMINI_MODELS_LIST_ENDPOINT } from './lib/geminiLogger.js';
 import { warmupModelDiscovery } from './lib/geminiModelResolver.js';
 import { warmupTrackingModels, getTrackingBackendName } from './lib/tracking/modelLoader.js';
@@ -141,8 +142,8 @@ app.listen(PORT, '0.0.0.0', () => {
       });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  const hasKey = Boolean(apiKey && apiKey !== 'PASTE_KEY_HERE');
+  const apiKey = resolveGeminiApiKey(process.env.GEMINI_API_KEY);
+  const hasKey = Boolean(apiKey);
 
   if (hasKey) {
     console.log('Gemini API key loaded from environment.');

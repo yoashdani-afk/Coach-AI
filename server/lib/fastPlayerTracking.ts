@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { buildTrackingSystemInstruction, buildTrackingUserPrompt } from './buildTrackingPrompt.js';
+import { resolveGeminiApiKey } from './geminiApiKey.js';
 import { resolveAnalysisModel } from './geminiModelResolver.js';
 import {
   extractPlayerGroundingFrames,

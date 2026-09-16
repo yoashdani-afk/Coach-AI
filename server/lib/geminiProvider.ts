@@ -10,6 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { isServerAnalysisError, ServerAnalysisError } from './analysisErrors.js';
 import { buildSystemInstruction, buildUserPrompt } from './buildPrompt.js';
+import { resolveGeminiApiKey } from './geminiApiKey.js';
 import {
   detectRejectedField,
   isInvalidArgumentError,
@@ -94,8 +95,8 @@ function logAndRethrowGeminiError(
 }
 
 function getApiKey(): string {
-  const key = process.env.GEMINI_API_KEY?.trim();
-  if (!key || key === 'PASTE_KEY_HERE') {
+  const key = resolveGeminiApiKey(process.env.GEMINI_API_KEY);
+  if (!key) {
     throw new ServerAnalysisError(
       'GEMINI_API_KEY is not set on the server',
       'MISSING_API_KEY'
