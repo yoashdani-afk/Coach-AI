@@ -1,5 +1,6 @@
 import './lib/tracking/tfNodePolyfill.js';
 import 'dotenv/config';
+import { spawn } from 'node:child_process';
 import cors from 'cors';
 import express from 'express';
 import multer from 'multer';
@@ -13,6 +14,7 @@ import {
 } from './api/tracking-jobs.js';
 import { handleDebugPlayerFrame } from './api/debug-player-frame.js';
 import { handleVideoFrame } from './api/video-frame.js';
+import { FFMPEG_PATH } from './lib/ffmpegPath.js';
 import { GEMINI_MODELS_LIST_ENDPOINT } from './lib/geminiLogger.js';
 import { warmupModelDiscovery } from './lib/geminiModelResolver.js';
 import { warmupTrackingModels, getTrackingBackendName } from './lib/tracking/modelLoader.js';
@@ -37,6 +39,33 @@ app.get('/health', (_req, res) => {
     ok: true,
     service: 'coach-ai-analysis',
     trackingEngine: getTrackingEngine(),
+    ffmpegPath: FFMPEG_PATH,
+  });
+});
+
+/** Confirms system ffmpeg + libx264 are available (Railway diagnose). */
+app.get('/health/ffmpeg', (_req, res) => {
+  const stderr: Buffer[] = [];
+  const proc = spawn(FFMPEG_PATH, ['-hide_banner', '-encoders']);
+  proc.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
+  proc.stdout.on('data', (chunk: Buffer) => stderr.push(chunk));
+  proc.on('error', (err) => {
+    res.status(500).json({
+      ok: false,
+      ffmpegPath: FFMPEG_PATH,
+      error: err.message,
+    });
+  });
+  proc.on('close', (code) => {
+    const out = Buffer.concat(stderr).toString('utf8');
+    const hasLibx264 = /\blibx264\b/.test(out);
+    res.status(hasLibx264 ? 200 : 500).json({
+      ok: hasLibx264,
+      ffmpegPath: FFMPEG_PATH,
+      exitCode: code,
+      hasLibx264,
+      versionLine: out.split('\n').find((l) => /ffmpeg version/i.test(l)) ?? null,
+    });
   });
 });
 
@@ -84,6 +113,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Coach AI analysis server listening on http://0.0.0.0:${PORT}`);
+  console.log('[FFmpeg] path =', FFMPEG_PATH);
   console.log('[Tracking] Engine =', getTrackingEngine());
 
   if (isBotsortEngine()) {

@@ -27,7 +27,10 @@ function runFfmpegNormalizeVideo(
   rotation: CanonicalRotation
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    const filter = rotationToFfmpegVideoFilter(rotation);
+    const rotate = rotationToFfmpegVideoFilter(rotation);
+    // Cap resolution + ultrafast to avoid Railway OOM (close code null / "unknown").
+    const scale = "scale='min(1280,iw)':-2";
+    const vf = rotate ? `${rotate},${scale}` : scale;
     const args = [
       '-hide_banner',
       '-loglevel',
@@ -35,34 +38,44 @@ function runFfmpegNormalizeVideo(
       '-noautorotate',
       '-i',
       sourcePath,
-      ...(filter ? ['-vf', filter] : []),
+      '-vf',
+      vf,
       '-c:v',
       'libx264',
       '-preset',
-      'fast',
+      'ultrafast',
       '-crf',
-      '23',
+      '28',
+      '-threads',
+      '1',
       '-c:a',
       'aac',
+      '-b:a',
+      '96k',
       '-movflags',
       '+faststart',
       '-y',
       outputPath,
     ];
 
+    console.log('[AnalysisMedia] ffmpeg normalize start', { ffmpeg: FFMPEG_PATH, rotation, vf });
+
     const stderr: Buffer[] = [];
     const proc = spawn(FFMPEG_PATH, args);
 
     proc.stderr.on('data', (chunk: Buffer) => stderr.push(chunk));
-    proc.on('error', reject);
-    proc.on('close', (code) => {
+    proc.on('error', (err) => {
+      reject(new Error(`ffmpeg spawn failed (${FFMPEG_PATH}): ${err.message}`));
+    });
+    proc.on('close', (code, signal) => {
       if (code === 0) {
         resolve();
         return;
       }
+      const detail = Buffer.concat(stderr).toString('utf8').trim();
       reject(
         new Error(
-          `ffmpeg video normalization failed (code ${code ?? 'unknown'}): ${Buffer.concat(stderr).toString('utf8').trim()}`
+          `ffmpeg video normalization failed (code ${code ?? 'unknown'}${signal ? `, signal ${signal}` : ''}, bin ${FFMPEG_PATH}): ${detail || '(no stderr — often OOM/SIGKILL)'}`
         )
       );
     });
@@ -103,6 +116,7 @@ export async function normalizeAnalysisVideo(
     outputHeight: result.outputHeight,
     appliedRotation: result.appliedRotation,
     orientation: result.orientation,
+    ffmpeg: FFMPEG_PATH,
   });
 
   return result;

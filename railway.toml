@@ -1,7 +1,9 @@
 # Force Railway to use the analysis server Dockerfile (not Railpack / dist).
+# Path is repo-root Dockerfile (same content as server/Dockerfile) so Railway UI
+# "Dockerfile" / "Dockerfile Path: Dockerfile" also works.
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "server/Dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 healthcheckPath = "/health"
