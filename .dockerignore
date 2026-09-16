@@ -1,0 +1,19 @@
+# Keep Railway Docker context lean when building from repo root.
+node_modules
+**/node_modules
+.env
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.expo
+ios
+android
+tracker_service
+supabase
+docs
+*.md
+npm-debug.log*
+.DS_Store
+server/scripts
+server/.tracking-debug
