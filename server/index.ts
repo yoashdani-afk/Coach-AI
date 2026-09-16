@@ -97,14 +97,17 @@ app.listen(PORT, '0.0.0.0', () => {
       }
     });
   } else {
+    // Warmup must not crash the process — frame extract + analyse-video do not need TF.js.
+    // Exit-on-failure caused Railway 502s when native bindings failed in Docker.
     void warmupTrackingModels()
       .then(() => {
         console.log('[Tracking] startup warmup complete, backend =', getTrackingBackendName());
       })
       .catch((error) => {
-        console.error('[Tracking] FATAL: model warmup failed — tracking will not work.');
+        console.error(
+          '[Tracking] model warmup failed — custom tracking unavailable; analyse-video still runs.'
+        );
         console.error(error instanceof Error ? error.message : error);
-        process.exit(1);
       });
   }
 
