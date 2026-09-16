@@ -16,6 +16,7 @@ import { handleDebugPlayerFrame } from './api/debug-player-frame.js';
 import { handleVideoFrame } from './api/video-frame.js';
 import { FFMPEG_PATH } from './lib/ffmpegPath.js';
 import { resolveGeminiApiKey } from './lib/geminiApiKey.js';
+import { resolveAnalysisPipeline } from './lib/analysisPipelineConfig.js';
 import { GEMINI_MODELS_LIST_ENDPOINT } from './lib/geminiLogger.js';
 import { warmupModelDiscovery } from './lib/geminiModelResolver.js';
 import { warmupTrackingModels, getTrackingBackendName } from './lib/tracking/modelLoader.js';
@@ -40,6 +41,7 @@ app.get('/health', (_req, res) => {
     ok: true,
     service: 'coach-ai-analysis',
     trackingEngine: getTrackingEngine(),
+    analysisPipeline: resolveAnalysisPipeline(),
     ffmpegPath: FFMPEG_PATH,
   });
 });
