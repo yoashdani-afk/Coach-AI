@@ -54,9 +54,7 @@ async function extractFrameAt(videoPath: string, timestampSec: number): Promise<
 }
 
 function getApiKey(): string | null {
-  const key = process.env.GEMINI_API_KEY?.trim();
-  if (!key || key === 'PASTE_KEY_HERE') return null;
-  return key;
+  return resolveGeminiApiKey(process.env.GEMINI_API_KEY);
 }
 
 export async function trackPlayerPreviewFast(params: {
