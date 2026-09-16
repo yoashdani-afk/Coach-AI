@@ -51,7 +51,7 @@ supabase secrets set GEMINI_API_KEY=your-key
 
 ## Monetisation
 
-- Free tier: **3 analyses/month** (enforced in edge function)
+- Free tier: **1 analysis/month** (enforced in edge function)
 - Beta bonus credits: update `profiles.analyses_bonus_credits` manually in SQL:
 
 ```sql

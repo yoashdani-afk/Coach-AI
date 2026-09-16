@@ -288,7 +288,7 @@ export default function ProfileSetupScreen() {
     return prev;
   };
 
-  const finishSetup = () => {
+  const finishSetup = async () => {
     if (
       !canContinueForStep(18) ||
       !canContinueForStep(17) ||
@@ -341,6 +341,13 @@ export default function ProfileSetupScreen() {
 
     setProfile(profile);
     setHasSeenOnboarding(true);
+
+    // First-time setup → Pro paywall; edit mode returns to the app.
+    if (!isEditMode) {
+      router.replace('/pro?from=onboarding');
+      return;
+    }
+
     router.replace('/(tabs)');
   };
 
@@ -349,7 +356,7 @@ export default function ProfileSetupScreen() {
       setStep(nextStepFrom(step));
       return;
     }
-    finishSetup();
+    void finishSetup();
   };
 
   const handleBack = () => {
@@ -382,6 +389,7 @@ export default function ProfileSetupScreen() {
       onBack={handleBack}
       onContinue={handleContinue}
       continueDisabled={!canContinue}
+      continueLoading={false}
       continueLabel={step === TOTAL_STEPS ? (isEditMode ? 'Save profile' : 'Finish setup') : 'Continue'}
     >
       {step === 1 ? (

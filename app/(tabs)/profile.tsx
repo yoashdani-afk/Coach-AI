@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ScrollView, View, Text, Alert, Pressable, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,12 +21,16 @@ import {
   formatWeightForDisplay,
 } from '@/lib/profileUtils';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
-import { logOutRevenueCatUser } from '@/lib/revenueCat';
+import {
+  canManageProOnThisPlatform,
+  logOutRevenueCatUser,
+  presentProCustomerCenter,
+} from '@/lib/revenueCat';
 import { useAuthStore } from '@/stores/authStore';
 import { useEntitlementStore, useIsPro } from '@/stores/entitlementStore';
 import { useProfileStore, profileNeedsCompletion } from '@/stores/profileStore';
 import { getRemainingAnalyses, isDevUnlimitedAnalyses } from '@/lib/analysisCredits';
-import { getAnalysisLimit } from '@/lib/entitlements';
+import { getAnalysisLimit, proPaywallHref } from '@/lib/entitlements';
 
 const PRIMARY_GREEN = '#00C853';
 const FOCUS_BLUE = '#5B8DEF';
@@ -138,7 +143,7 @@ export default function ProfileScreen() {
   const resetAll = useProfileStore((s) => s.resetAll);
   const clearProfile = useProfileStore((s) => s.clearProfile);
   const setSignedIn = useProfileStore((s) => s.setSignedIn);
-  const resetFreeAnalyses = useProfileStore((s) => s.resetFreeAnalyses);
+  const resetMyAnalysisUsage = useProfileStore((s) => s.resetMyAnalysisUsage);
   const analysesMonthlyLimit = useProfileStore((s) => s.analysesMonthlyLimit);
   const isPro = useIsPro();
   const effectiveLimit = Math.max(analysesMonthlyLimit, getAnalysisLimit(isPro));
@@ -146,14 +151,49 @@ export default function ProfileScreen() {
   const remaining = getRemainingAnalyses(profile, effectiveLimit);
   const unlimited = isDevUnlimitedAnalyses();
   const needsCompletion = profileNeedsCompletion(profile);
+  const canManagePro = canManageProOnThisPlatform();
+  const [managingSubscription, setManagingSubscription] = useState(false);
 
-  const handleResetFreeAnalyses = () => {
+  const handleManageSubscription = async () => {
+    setManagingSubscription(true);
+    try {
+      await presentProCustomerCenter();
+    } finally {
+      setManagingSubscription(false);
+    }
+  };
+
+  const handleResetMyAnalyses = () => {
+    const run = async () => {
+      const result = await resetMyAnalysisUsage(effectiveLimit);
+      if (!result.ok) {
+        showAlert('Reset failed', result.message);
+        return;
+      }
+      showAlert(
+        'Analyses reset',
+        `Your account usage is back to 0 / ${effectiveLimit} for the current period.`
+      );
+    };
+
+    if (Platform.OS === 'web') {
+      if (
+        confirmAction(
+          'Reset my analyses',
+          `Reset your Supabase analyses counter to 0 for this account? Limit shown: ${effectiveLimit}/month.`
+        )
+      ) {
+        void run();
+      }
+      return;
+    }
+
     Alert.alert(
-      'Reset free analyses',
-      `Local counter only (dev). Remote Supabase usage is unchanged. Limit shown: ${analysesMonthlyLimit}/month.`,
+      'Reset my analyses',
+      `Resets your remote Supabase counter (this account only). Limit shown: ${effectiveLimit}/month.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Reset', onPress: () => resetFreeAnalyses() },
+        { text: 'Reset', onPress: () => void run() },
       ]
     );
   };
@@ -319,6 +359,54 @@ export default function ProfileScreen() {
           density="profile"
         />
 
+        <Card
+          variant="outlined"
+          className="overflow-hidden"
+          style={{
+            borderLeftWidth: 2,
+            borderLeftColor: PRIMARY_GREEN,
+            borderColor: isPro ? 'rgba(0, 200, 83, 0.35)' : 'rgba(255,255,255,0.08)',
+          }}
+        >
+          <View className="flex-row items-start gap-3">
+            <View
+              className="w-10 h-10 rounded-xl items-center justify-center"
+              style={{ backgroundColor: `${PRIMARY_GREEN}33` }}
+            >
+              <Ionicons name={isPro ? 'checkmark-circle' : 'star'} size={22} color={PRIMARY_GREEN} />
+            </View>
+            <View className="flex-1 gap-3">
+              <View>
+                <Text className="text-text-primary font-semibold">
+                  {isPro ? 'GoalX Pro' : 'Unlock Pro'}
+                </Text>
+                <Text className="text-text-secondary text-sm mt-1 leading-5">
+                  {isPro
+                    ? 'Manage billing, restore purchases, or change plans.'
+                    : 'More analyses, Hall of Fame slots, and the full weekly regimen.'}
+                </Text>
+              </View>
+              {isPro && canManagePro ? (
+                <Button
+                  label="Manage subscription"
+                  variant="secondary"
+                  fullWidth
+                  loading={managingSubscription}
+                  disabled={managingSubscription}
+                  onPress={() => void handleManageSubscription()}
+                />
+              ) : (
+                <Button
+                  label={isPro ? 'Pro details' : 'Upgrade to Pro'}
+                  variant={isPro ? 'secondary' : 'primary'}
+                  fullWidth
+                  onPress={() => router.push(proPaywallHref())}
+                />
+              )}
+            </View>
+          </View>
+        </Card>
+
         <ProfileSectionCard title="About" icon="globe-outline" accent={FOCUS_BLUE}>
           <ProfileRow
             label="Date of birth"
@@ -431,10 +519,10 @@ export default function ProfileScreen() {
           {__DEV__ ? (
             <>
               <Button
-                label="Reset free analyses"
+                label="Reset my analyses"
                 variant="secondary"
                 fullWidth
-                onPress={handleResetFreeAnalyses}
+                onPress={handleResetMyAnalyses}
               />
               <Button
                 label="Marker preview (debug)"

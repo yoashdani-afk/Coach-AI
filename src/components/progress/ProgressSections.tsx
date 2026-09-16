@@ -16,7 +16,7 @@ export function ProgressClipsStatCard({ count }: { count: number }) {
   return (
     <Card
       variant="elevated"
-      className="flex-1 gap-2 overflow-hidden py-4"
+      className="gap-2 overflow-hidden py-4"
       style={{ borderLeftWidth: 2, borderLeftColor: `${PRIMARY_GREEN}66` }}
     >
       <View
@@ -43,10 +43,10 @@ export function ProgressLatestStatCard({
   const showScore = report.mode !== 'COACH_ME';
 
   return (
-    <Pressable onPress={onPress} className="flex-1 active:opacity-80" accessibilityRole="button">
+    <Pressable onPress={onPress} className="active:opacity-80" accessibilityRole="button">
       <Card
         variant="elevated"
-        className="gap-2 overflow-hidden py-4 h-full"
+        className="gap-2 overflow-hidden py-4"
         style={{ borderLeftWidth: 2, borderLeftColor: `${accent}66` }}
       >
         <View

@@ -34,7 +34,8 @@ export function PlayerMarkerOverlay({
 
   const color = colorForState(state);
   const opacity = opacityForState(state);
-  const dot = 5;
+  const xSize = 14;
+  const stroke = 3;
   const arrowHeight = PLAYER_MARKER_ARROW_SHAFT_PX;
   const arrowWidth = Math.max(10, arrowHeight * 0.65);
 
@@ -71,20 +72,46 @@ export function PlayerMarkerOverlay({
         </View>
       ) : null}
 
+      {/* GoalX-style tap marker */}
       <View
         style={{
           position: 'absolute',
-          left: marker.dotX - dot,
-          top: marker.dotY - dot,
-          width: dot * 2,
-          height: dot * 2,
-          borderRadius: dot,
-          backgroundColor: color,
-          borderWidth: 2,
-          borderColor: '#FFFFFF',
+          left: marker.dotX - xSize / 2,
+          top: marker.dotY - xSize / 2,
+          width: xSize,
+          height: xSize,
           opacity,
         }}
-      />
+      >
+        <View
+          style={{
+            position: 'absolute',
+            left: (xSize - stroke) / 2,
+            top: 0,
+            width: stroke,
+            height: xSize,
+            borderRadius: stroke / 2,
+            backgroundColor: color,
+            borderWidth: 1,
+            borderColor: '#FFFFFF',
+            transform: [{ rotate: '45deg' }],
+          }}
+        />
+        <View
+          style={{
+            position: 'absolute',
+            left: (xSize - stroke) / 2,
+            top: 0,
+            width: stroke,
+            height: xSize,
+            borderRadius: stroke / 2,
+            backgroundColor: color,
+            borderWidth: 1,
+            borderColor: '#FFFFFF',
+            transform: [{ rotate: '-45deg' }],
+          }}
+        />
+      </View>
     </View>
   );
 }

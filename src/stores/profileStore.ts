@@ -4,6 +4,7 @@ import { getAnalysisLimit } from '@/lib/entitlements';
 import {
   consumeAnalysisCreditRemote,
   fetchAnalysisUsage,
+  resetMyAnalysisUsageRemote,
   type AnalysisUsageSnapshot,
 } from '@/lib/analysisUsageRemote';
 import { createAppJSONStorage } from '@/lib/appStorage';
@@ -35,6 +36,14 @@ interface ProfileState {
     attemptId: string,
     monthlyLimit?: number
   ) => Promise<boolean>;
+  /**
+   * Reset the signed-in user's remote analyses_used_this_month (own account only),
+   * then refresh local usage display. Intended for __DEV__ testing.
+   */
+  resetMyAnalysisUsage: (
+    monthlyLimit?: number
+  ) => Promise<{ ok: true } | { ok: false; message: string }>;
+  /** Local-only counter clear (legacy / one-time hydrate migration). Prefer resetMyAnalysisUsage. */
   resetFreeAnalyses: () => void;
   clearProfile: () => void;
   resetAll: () => void;
@@ -132,6 +141,31 @@ export const useProfileStore = create<ProfileState>()(
         return !result.duplicate;
       },
 
+      resetMyAnalysisUsage: async (monthlyLimit) => {
+        if (!useAuthStore.getState().session) {
+          return { ok: false, message: 'Sign in required to reset remote analysis usage.' };
+        }
+
+        const limit = monthlyLimit ?? get().analysesMonthlyLimit ?? getAnalysisLimit(false);
+        const result = await resetMyAnalysisUsageRemote(limit);
+        if (!result.ok) {
+          return { ok: false, message: result.message };
+        }
+
+        get().applyAnalysisUsage(result.usage);
+        useAnalysisCreditsStore.getState().resetConsumedAttempts();
+
+        // Refresh from get_analysis_usage when free-tier simulation is on (unlimited skips it).
+        await get().refreshAnalysisUsage(limit);
+
+        console.log('[Credits] Remote analysis usage reset for signed-in user', {
+          used: result.usage.used,
+          remaining: result.usage.remaining,
+          limit: result.usage.limit,
+        });
+        return { ok: true };
+      },
+
       resetFreeAnalyses: () => {
         const profile = get().profile;
         if (!profile) return;
@@ -145,7 +179,7 @@ export const useProfileStore = create<ProfileState>()(
         });
         useAnalysisCreditsStore.getState().resetConsumedAttempts();
         console.log(
-          '[Credits] Local analyses counter reset (dev). Remote usage is unchanged — wait for month rollover or SQL reset.'
+          '[Credits] Local analyses counter reset (dev). Remote usage is unchanged — use resetMyAnalysisUsage for Supabase.'
         );
       },
 

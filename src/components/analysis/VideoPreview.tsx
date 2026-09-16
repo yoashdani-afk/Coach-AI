@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -64,6 +65,20 @@ async function probeUriExists(uri: string): Promise<boolean> {
   }
 }
 
+function safeReleasePlayer(player: {
+  pause: () => void;
+  replaceAsync: (source: null) => Promise<void>;
+}) {
+  try {
+    player.pause();
+  } catch {
+    // Native player may already be torn down during navigation.
+  }
+  void player.replaceAsync(null).catch(() => {
+    // Ignore races when router.back() unmounts before replaceAsync settles.
+  });
+}
+
 function VideoPreviewPlayer({
   uri,
   className = '',
@@ -72,10 +87,22 @@ function VideoPreviewPlayer({
   className?: string;
 }) {
   const [failed, setFailed] = useState(false);
+  const [showNativeView, setShowNativeView] = useState(true);
   const player = useVideoPlayer(uri, (p) => {
     p.loop = false;
     p.muted = false;
   });
+
+  // Detach VideoView before the screen unmounts — prevents TestFlight crashes on back.
+  useFocusEffect(
+    useCallback(() => {
+      setShowNativeView(true);
+      return () => {
+        setShowNativeView(false);
+        safeReleasePlayer(player);
+      };
+    }, [player])
+  );
 
   useEffect(() => {
     setFailed(false);
@@ -86,7 +113,7 @@ function VideoPreviewPlayer({
     });
     return () => {
       sub.remove();
-      player.pause();
+      safeReleasePlayer(player);
     };
   }, [player, uri]);
 
@@ -101,14 +128,16 @@ function VideoPreviewPlayer({
       className={`overflow-hidden rounded-xl bg-surface border border-border ${className}`}
       style={{ width: '100%', aspectRatio: 16 / 9 }}
     >
-      <VideoView
-        player={player}
-        style={{ width: '100%', height: '100%' }}
-        contentFit="contain"
-        nativeControls
-        // Web only — avoids CORS audio issues for remote http(s) sources; harmless for blob:.
-        {...(Platform.OS === 'web' ? { crossOrigin: 'anonymous' as const } : null)}
-      />
+      {showNativeView ? (
+        <VideoView
+          player={player}
+          style={{ width: '100%', height: '100%' }}
+          contentFit="contain"
+          nativeControls
+          // Web only — avoids CORS audio issues for remote http(s) sources; harmless for blob:.
+          {...(Platform.OS === 'web' ? { crossOrigin: 'anonymous' as const } : null)}
+        />
+      ) : null}
     </View>
   );
 }

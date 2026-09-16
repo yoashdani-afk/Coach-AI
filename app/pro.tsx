@@ -1,5 +1,14 @@
-import { useMemo } from 'react';
-import { View, Text, Pressable, Platform, ScrollView, StyleSheet } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,11 +19,21 @@ import {
   FREE_HOF_ENTRY_LIMIT,
   PRO_ANALYSES_PER_MONTH,
   PRO_HOF_ENTRY_LIMIT,
-  PRO_PRICE_LABEL,
+  PRO_MONTHLY_PRICE_LABEL,
+  PRO_YEARLY_PRICE_LABEL,
 } from '@/lib/entitlements';
 import { FREE_TIER_ANALYSES_PER_MONTH } from '@/lib/constants';
-import { useIsPro } from '@/stores/entitlementStore';
-import { showComingSoon } from '@/lib/alerts';
+import { useEntitlementStore, useIsPro } from '@/stores/entitlementStore';
+import {
+  canManageProOnThisPlatform,
+  canPurchaseProOnThisPlatform,
+  getProPlans,
+  presentProCustomerCenter,
+  purchaseProPlan,
+  type ProPlan,
+  type ProPlanKind,
+  restoreProPurchases,
+} from '@/lib/revenueCat';
 
 type PaywallReason = 'analyses' | 'hof' | 'weekly' | 'default';
 
@@ -23,6 +42,15 @@ type Benefit = {
   title: string;
   body: string;
   accent: string;
+};
+
+type DisplayPlan = {
+  kind: ProPlanKind;
+  title: string;
+  subtitle: string;
+  priceLabel: string;
+  period: string;
+  live: ProPlan | null;
 };
 
 const BENEFITS: Benefit[] = [
@@ -46,6 +74,26 @@ const BENEFITS: Benefit[] = [
   },
 ];
 
+const PLAN_META: Record<
+  ProPlanKind,
+  { title: string; subtitle: string; fallbackPrice: string; period: string }
+> = {
+  yearly: {
+    title: 'Yearly',
+    subtitle: 'Best value · billed annually',
+    fallbackPrice: PRO_YEARLY_PRICE_LABEL,
+    period: '/ year',
+  },
+  monthly: {
+    title: 'Monthly',
+    subtitle: 'Flexible · cancel anytime',
+    fallbackPrice: PRO_MONTHLY_PRICE_LABEL,
+    period: '/ month',
+  },
+};
+
+const PLAN_KINDS: ProPlanKind[] = ['monthly', 'yearly'];
+
 function reasonCopy(reason: PaywallReason): { eyebrow: string; headline: string } {
   switch (reason) {
     case 'analyses':
@@ -61,11 +109,11 @@ function reasonCopy(reason: PaywallReason): { eyebrow: string; headline: string 
     case 'weekly':
       return {
         eyebrow: 'Weekly Regimen',
-        headline: 'Build your week like a Pro',
+        headline: 'Train Like the Pros',
       };
     default:
       return {
-        eyebrow: 'Coach AI Pro',
+        eyebrow: 'GoalX Pro',
         headline: 'Level up your coaching',
       };
   }
@@ -77,22 +125,155 @@ function parseReason(raw: string | string[] | undefined): PaywallReason {
   return 'default';
 }
 
+function showNotice(title: string, message: string) {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') window.alert(`${title}\n\n${message}`);
+    return;
+  }
+  Alert.alert(title, message);
+}
+
 /**
  * Pro paywall / status screen.
- * Subscribe is Coming soon until RevenueCat store products are live
- * (presentProPaywall in revenueCat.ts is ready to wire when enrollment finishes).
+ * Always shows Yearly + Monthly. Live store prices replace marketing fallbacks when available.
  */
 export default function ProScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { reason: reasonParam } = useLocalSearchParams<{ reason?: string }>();
+  const { reason: reasonParam, from: fromParam } = useLocalSearchParams<{
+    reason?: string;
+    from?: string;
+  }>();
   const reason = parseReason(reasonParam);
+  const fromOnboarding = (Array.isArray(fromParam) ? fromParam[0] : fromParam) === 'onboarding';
   const copy = useMemo(() => reasonCopy(reason), [reason]);
   const isPro = useIsPro();
+  const lastError = useEntitlementStore((s) => s.lastError);
   const isWeb = Platform.OS === 'web';
+  const canPurchase = canPurchaseProOnThisPlatform();
+  const canManage = canManageProOnThisPlatform();
 
-  const handleSubscribe = () => {
-    showComingSoon('Pro subscriptions');
+  const leavePaywall = useCallback(() => {
+    if (fromOnboarding) {
+      router.replace('/(tabs)');
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/(tabs)');
+  }, [fromOnboarding, router]);
+
+  const [livePlans, setLivePlans] = useState<ProPlan[]>([]);
+  const [plansLoading, setPlansLoading] = useState(canPurchase);
+  const [selectedKind, setSelectedKind] = useState<ProPlanKind>('monthly');
+  const [busyAction, setBusyAction] = useState<'subscribe' | 'restore' | 'manage' | null>(
+    null
+  );
+
+  const loadPlans = useCallback(async () => {
+    if (!canPurchase) {
+      setLivePlans([]);
+      setPlansLoading(false);
+      return;
+    }
+    setPlansLoading(true);
+    try {
+      const next = await getProPlans();
+      setLivePlans(next);
+      setSelectedKind((current) => {
+        if (next.some((plan) => plan.kind === current)) return current;
+        return next.find((plan) => plan.kind === 'monthly')?.kind ?? next[0]?.kind ?? 'monthly';
+      });
+    } finally {
+      setPlansLoading(false);
+    }
+  }, [canPurchase]);
+
+  useEffect(() => {
+    void loadPlans();
+  }, [loadPlans]);
+
+  const displayPlans: DisplayPlan[] = useMemo(
+    () =>
+      PLAN_KINDS.map((kind) => {
+        const meta = PLAN_META[kind];
+        const live = livePlans.find((plan) => plan.kind === kind) ?? null;
+        return {
+          kind,
+          title: meta.title,
+          subtitle: meta.subtitle,
+          // Always show euro marketing prices. StoreKit may return a US Sandbox
+          // storefront string ($3.99) even when checkout charges EUR.
+          priceLabel: meta.fallbackPrice,
+          period: meta.period,
+          live,
+        };
+      }),
+    [livePlans]
+  );
+
+  const selectedDisplay =
+    displayPlans.find((plan) => plan.kind === selectedKind) ?? displayPlans[0];
+  const selectedLive = selectedDisplay.live;
+
+  const handleSubscribe = async () => {
+    if (isWeb || !canPurchase) {
+      showNotice(
+        'Available on iOS and Android',
+        'Subscribe in the iOS or Android app with the same account — Pro syncs here automatically.'
+      );
+      return;
+    }
+
+    if (!selectedLive) {
+      showNotice(
+        'Plans unavailable',
+        'App Store plans have not loaded yet. Check your connection and try again in a moment.'
+      );
+      return;
+    }
+
+    setBusyAction('subscribe');
+    try {
+      const unlocked = await purchaseProPlan(selectedLive);
+      if (unlocked) {
+        showNotice('Welcome to Pro', 'Your Pro access is unlocked on this account.');
+      }
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleRestore = async () => {
+    setBusyAction('restore');
+    try {
+      const result = await restoreProPurchases();
+      if (result.restored) {
+        showNotice('Restored', 'Your Pro access is back on this device.');
+        return;
+      }
+      showNotice('Nothing to restore', result.message ?? 'No Pro subscription found.');
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const handleManage = async () => {
+    if (!canManage) {
+      showNotice(
+        'Manage on mobile',
+        'Open GoalX on iOS or Android to change, cancel, or restore your subscription.'
+      );
+      return;
+    }
+    setBusyAction('manage');
+    try {
+      await presentProCustomerCenter();
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   if (isPro) {
@@ -100,13 +281,13 @@ export default function ProScreen() {
       <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
         <View className="px-5 pt-2 pb-3 flex-row items-center">
           <Pressable
-            onPress={() => router.back()}
+            onPress={leavePaywall}
             className="w-10 h-10 items-center justify-center -ml-2"
             accessibilityLabel="Go back"
           >
             <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
           </Pressable>
-          <Text className="text-text-primary text-lg font-semibold flex-1">Coach AI Pro</Text>
+          <Text className="text-text-primary text-lg font-semibold flex-1">GoalX Pro</Text>
         </View>
         <View className="flex-1 px-5 justify-center gap-4" style={{ paddingBottom: insets.bottom + 24 }}>
           <View
@@ -126,7 +307,23 @@ export default function ProScreen() {
               Weekly Regimen unlocked.
             </Text>
           </View>
-          <Button label="Back" variant="secondary" onPress={() => router.back()} fullWidth size="lg" />
+          {lastError ? (
+            <Text className="text-sm leading-5" style={{ color: '#FF6B8A' }}>
+              {lastError}
+            </Text>
+          ) : null}
+          {canManage ? (
+            <Button
+              label="Manage subscription"
+              variant="secondary"
+              onPress={() => void handleManage()}
+              loading={busyAction === 'manage'}
+              disabled={busyAction !== null}
+              fullWidth
+              size="lg"
+            />
+          ) : null}
+          <Button label="Back" variant="secondary" onPress={leavePaywall} fullWidth size="lg" />
         </View>
       </View>
     );
@@ -144,7 +341,7 @@ export default function ProScreen() {
       <View style={{ paddingTop: insets.top }} className="flex-1">
         <View className="px-5 pt-2 pb-2 flex-row items-center">
           <Pressable
-            onPress={() => router.back()}
+            onPress={leavePaywall}
             className="w-10 h-10 items-center justify-center -ml-2"
             accessibilityLabel="Go back"
           >
@@ -202,15 +399,53 @@ export default function ProScreen() {
               style={StyleSheet.absoluteFill}
             />
             <Text className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-1">
-              Pro membership
+              Choose your plan
             </Text>
             <View className="flex-row items-end gap-1.5 mb-1">
-              <Text className="text-text-primary text-4xl font-bold tracking-tight">{PRO_PRICE_LABEL}</Text>
-              <Text className="text-text-secondary text-base mb-1.5">/ month</Text>
+              <Text className="text-text-primary text-4xl font-bold tracking-tight">
+                {selectedDisplay.priceLabel}
+              </Text>
+              <Text className="text-text-secondary text-base mb-1.5">{selectedDisplay.period}</Text>
             </View>
-            <Text className="text-text-secondary text-sm leading-5">
-              Cancel anytime. Same coaching quality — just more of it.
+            <Text className="text-text-secondary text-sm leading-5 mb-4">
+              Monthly or yearly App Store plans. Cancel anytime.
             </Text>
+
+            {plansLoading ? (
+              <View className="py-3 mb-2">
+                <ActivityIndicator color="#00C853" />
+              </View>
+            ) : null}
+
+            <View className="gap-2">
+              {displayPlans.map((plan) => {
+                const selected = plan.kind === selectedDisplay.kind;
+                return (
+                  <Pressable
+                    key={plan.kind}
+                    onPress={() => setSelectedKind(plan.kind)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    className="flex-row items-center justify-between rounded-2xl px-4 py-3"
+                    style={{
+                      backgroundColor: selected
+                        ? 'rgba(0,200,83,0.16)'
+                        : 'rgba(255,255,255,0.04)',
+                      borderWidth: 1,
+                      borderColor: selected
+                        ? 'rgba(0,200,83,0.55)'
+                        : 'rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    <View className="flex-1 pr-3">
+                      <Text className="text-text-primary font-semibold">{plan.title}</Text>
+                      <Text className="text-text-muted text-xs mt-0.5">{plan.subtitle}</Text>
+                    </View>
+                    <Text className="text-text-primary font-bold">{plan.priceLabel}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
 
           {isWeb ? (
@@ -219,6 +454,11 @@ export default function ProScreen() {
             </Text>
           ) : null}
 
+          {lastError ? (
+            <Text className="text-sm leading-5 mb-2" style={{ color: '#FF6B8A' }}>
+              {lastError}
+            </Text>
+          ) : null}
         </ScrollView>
 
         <View
@@ -226,15 +466,24 @@ export default function ProScreen() {
           style={{ paddingBottom: insets.bottom + 16 }}
         >
           <Button
-            label="Subscribe — Coming soon"
-            onPress={handleSubscribe}
+            label={`Subscribe — ${selectedDisplay.title}`}
+            onPress={() => void handleSubscribe()}
+            loading={busyAction === 'subscribe'}
+            disabled={busyAction !== null}
             fullWidth
             size="lg"
           />
-          <Text className="text-text-muted text-xs text-center">
-            Purchases go live after App Store / Play setup. Tap Subscribe for status.
-          </Text>
-          <Button label="Not now" variant="ghost" onPress={() => router.back()} fullWidth />
+          {canPurchase ? (
+            <Button
+              label="Restore purchases"
+              variant="ghost"
+              onPress={() => void handleRestore()}
+              loading={busyAction === 'restore'}
+              disabled={busyAction !== null}
+              fullWidth
+            />
+          ) : null}
+          <Button label="Not now" variant="ghost" onPress={leavePaywall} fullWidth />
         </View>
       </View>
     </View>

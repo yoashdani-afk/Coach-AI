@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Coach AI",
+    "name": "GoalX",
     "slug": "coach-ai",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.coachai.mobile",
+      "bundleIdentifier": "com.footballdani.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -25,7 +25,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0D0D0F"
       },
-      "package": "app.coachai.mobile",
+      "package": "com.footballdani.app",
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.RECORD_AUDIO"
@@ -43,7 +43,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Coach AI to access your videos so you can upload clips for coaching feedback."
+          "photosPermission": "Allow GoalX to access your videos so you can upload clips for coaching feedback."
         }
       ],
       "expo-video"

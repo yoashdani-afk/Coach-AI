@@ -1,6 +1,6 @@
 import {
-  ANALYSIS_API_URL,
   analysisEndpoint,
+  getAnalysisApiUrl,
   isAnalysisApiConfigured,
   logAnalysisApiTarget,
 } from '@/lib/analysisConfig';
@@ -10,7 +10,7 @@ const HEALTH_TIMEOUT_MS = 8_000;
 export async function checkAnalysisServerHealth(
   signal?: AbortSignal
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (!isAnalysisApiConfigured) {
+  if (!isAnalysisApiConfigured()) {
     return {
       ok: false,
       message:
@@ -76,5 +76,5 @@ export async function checkAnalysisServerHealth(
 }
 
 export function getConfiguredAnalysisApiUrl(): string {
-  return ANALYSIS_API_URL;
+  return getAnalysisApiUrl();
 }

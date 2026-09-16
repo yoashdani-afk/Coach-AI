@@ -51,7 +51,7 @@ function userFacingFailureMessage(category: AnalysisFailureCategory, detail?: st
 export async function runAnalysis(
   request: AnalysisRequestPayload
 ): Promise<AnalysisRunResult> {
-  if (!isAnalysisApiConfigured) {
+  if (!isAnalysisApiConfigured()) {
     const category: AnalysisFailureCategory = 'API URL not configured';
     console.log('[Analysis] API URL not configured — failing without demo report');
     return {
@@ -62,7 +62,7 @@ export async function runAnalysis(
   }
 
   console.log('[Analysis] Provider: Gemini');
-  logAnalysisApiTarget('POST', '/api/analyse-video');
+  logAnalysisApiTarget('POST', '/api/analyse-video', { videoUri: request.clip.uri });
 
   try {
     const response = await GeminiProvider.analyse(request);

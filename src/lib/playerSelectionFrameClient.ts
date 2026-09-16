@@ -1,8 +1,9 @@
 import { Platform } from 'react-native';
 import {
-  ANALYSIS_API_URL,
   analysisEndpoint,
+  getAnalysisApiUrl,
   isAnalysisApiConfigured,
+  isLocalSimulator,
   logAnalysisApiTarget,
 } from '@/lib/analysisConfig';
 
@@ -30,7 +31,11 @@ function inferFileName(fileName: string | null): string {
   return 'clip.mp4';
 }
 
-function assertReachableFromPhone(apiUrl: string): void {
+function assertReachableFromPhone(apiUrl: string, videoUri: string): void {
+  // Simulator/web talk to the Mac via localhost — see analysisConfig.
+  if (Platform.OS === 'web') return;
+  if (isLocalSimulator(videoUri)) return;
+
   const lower = apiUrl.toLowerCase();
   if (
     lower.includes('localhost') ||
@@ -62,24 +67,30 @@ export async function requestPlayerSelectionFrame(params: {
   timestampMs: number;
   signal?: AbortSignal;
 }): Promise<PlayerSelectionFrameResponse> {
-  if (!isAnalysisApiConfigured) {
+  const urlOpts = { videoUri: params.videoUri };
+
+  if (!isAnalysisApiConfigured(urlOpts)) {
     throw new Error(
       'Analysis server is not configured. Set EXPO_PUBLIC_ANALYSIS_API_URL to your Mac LAN IP and restart Expo with --clear.'
     );
   }
 
-  assertReachableFromPhone(ANALYSIS_API_URL);
+  const apiUrl = getAnalysisApiUrl(urlOpts);
+  if (Platform.OS !== 'web') {
+    assertReachableFromPhone(apiUrl, params.videoUri);
+  }
 
-  const url = analysisEndpoint(VIDEO_FRAME_PATH);
+  const url = analysisEndpoint(VIDEO_FRAME_PATH, urlOpts);
 
   console.log('[PlayerSelection] FRAME REQUEST', {
     url,
-    apiUrl: ANALYSIS_API_URL,
+    apiUrl,
+    isSimulator: isLocalSimulator(params.videoUri),
     timestampMs: params.timestampMs,
     videoUri: params.videoUri,
   });
 
-  logAnalysisApiTarget('POST', VIDEO_FRAME_PATH);
+  logAnalysisApiTarget('POST', VIDEO_FRAME_PATH, urlOpts);
 
   const formData = new FormData();
   formData.append(

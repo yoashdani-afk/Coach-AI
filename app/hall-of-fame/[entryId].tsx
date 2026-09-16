@@ -61,11 +61,14 @@ export default function HallOfFamePublicReportScreen() {
   }, [load]);
 
   const goBackToHallOfFame = () => {
-    if (router.canGoBack()) {
-      router.back();
-      return;
-    }
-    router.replace('/(tabs)/hall-of-fame');
+    // Defer navigation one tick so VideoPreview can detach the native player first.
+    requestAnimationFrame(() => {
+      if (router.canGoBack()) {
+        router.back();
+        return;
+      }
+      router.replace('/(tabs)/hall-of-fame');
+    });
   };
 
   if (state.phase === 'loading') {

@@ -355,12 +355,12 @@ function HowItWorksSheet({ open, onClose }: { open: boolean; onClose: () => void
   );
 }
 
-/** Top brand lockup — matches mock: Coach AI + info control. */
+/** Top brand lockup — matches mock: GoalX + info control. */
 export function HomeBrandBar({ onInfoPress }: { onInfoPress: () => void }) {
   return (
     <View className="flex-row items-center justify-between px-0.5 mb-1">
       <Text style={{ fontSize: 28, fontWeight: '800', letterSpacing: -0.6, color: '#FFFFFF' }}>
-        Coach <Text style={{ color: PRIMARY }}>AI</Text>
+        Goal<Text style={{ color: PRIMARY }}>X</Text>
       </Text>
       <Pressable
         onPress={onInfoPress}

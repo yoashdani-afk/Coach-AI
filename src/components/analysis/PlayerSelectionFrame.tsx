@@ -17,7 +17,7 @@ import {
   requestPlayerSelectionFrame,
   type SelectionFrameOrientation,
 } from '@/lib/playerSelectionFrameClient';
-import { ANALYSIS_API_URL } from '@/lib/analysisConfig';
+import { getAnalysisApiUrl } from '@/lib/analysisConfig';
 import { assessTrackingQuality, initialSeekSeconds } from '@/lib/videoLayout';
 import type { MappedPlayerMarker } from '@/lib/videoViewportMapping';
 import type { PlayerSelection } from '@/types/analysis';
@@ -229,7 +229,7 @@ export function PlayerSelectionFrame({
           name: error instanceof Error ? error.name : undefined,
           message: error instanceof Error ? error.message : String(error),
           stack: error instanceof Error ? error.stack : undefined,
-          apiUrl: ANALYSIS_API_URL,
+          apiUrl: getAnalysisApiUrl({ videoUri: uri }),
           videoUri: uri,
           timestampMs: selectionTimestampMs,
         });
@@ -575,15 +575,41 @@ export function PlayerSelectionFrame({
                 pointerEvents="none"
                 style={{
                   position: 'absolute',
-                  left: zoomPreviewLayout.width / 2 - 6,
-                  top: zoomPreviewLayout.height / 2 - 6,
-                  width: 12,
-                  height: 12,
-                  borderRadius: 6,
-                  borderWidth: 2,
-                  borderColor: '#00C853',
+                  left: zoomPreviewLayout.width / 2 - 8,
+                  top: zoomPreviewLayout.height / 2 - 8,
+                  width: 16,
+                  height: 16,
                 }}
-              />
+              >
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: 6.5,
+                    top: 0,
+                    width: 3,
+                    height: 16,
+                    borderRadius: 1.5,
+                    backgroundColor: '#00C853',
+                    borderWidth: 1,
+                    borderColor: '#FFFFFF',
+                    transform: [{ rotate: '45deg' }],
+                  }}
+                />
+                <View
+                  style={{
+                    position: 'absolute',
+                    left: 6.5,
+                    top: 0,
+                    width: 3,
+                    height: 16,
+                    borderRadius: 1.5,
+                    backgroundColor: '#00C853',
+                    borderWidth: 1,
+                    borderColor: '#FFFFFF',
+                    transform: [{ rotate: '-45deg' }],
+                  }}
+                />
+              </View>
             </View>
           </View>
           <Text className="text-text-muted text-xs text-center leading-5">

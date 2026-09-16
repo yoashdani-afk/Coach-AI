@@ -41,7 +41,7 @@ export default function PickClipScreen() {
     if (!canStartAnalysis(profile, { monthlyLimit, isSignedIn: true })) {
       Alert.alert(
         'No analyses remaining',
-        `You have used all ${monthlyLimit} analyses this month. Upgrade to Pro for 12 analyses / month, or wait until the 1st (UTC).`,
+        `You have used all ${monthlyLimit} analyses this month. Upgrade to Pro for 12 analyses / month, or wait until your limit resets.`,
         [
           { text: 'Not now', style: 'cancel' },
           {

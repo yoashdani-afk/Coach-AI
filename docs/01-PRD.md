@@ -17,7 +17,7 @@ Coach AI v1 is a mobile app that gives every player their own personal football 
 
 **MVP goal:** Ship a beautiful, retention-focused app and get the first 100 users giving real feedback.
 
-**Business model:** Free tier — 3 AI clip analyses per month. Beta testers may receive manual credit top-ups. Paid subscriptions (Pro: higher limits, progress tracking, AI coach chat) added after demand is proven.
+**Business model:** Free tier — 1 AI clip analysis per month. Beta testers may receive manual credit top-ups. Paid subscriptions (Pro: higher limits, progress tracking, AI coach chat) added after demand is proven.
 
 ---
 
@@ -324,10 +324,10 @@ See `06-CV-PIPELINE.md` for the future computer vision roadmap.
 ## 11. Decisions (Final)
 
 ### Monetisation
-- **Free tier:** 3 AI clip analyses per month (controls AI usage cost during validation).
+- **Free tier:** 1 AI clip analysis per month (controls AI usage cost during validation).
 - **Beta users:** Manual credit top-ups for selected testers.
 - **Future:** Paid subscriptions after proving demand.
-  - Free: 3 analyses/month
+  - Free: 1 analysis/month
   - Pro: higher limits, progress tracking, AI coach chat, advanced features
 
 ### Sharing

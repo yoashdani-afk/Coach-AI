@@ -152,7 +152,8 @@ export async function createTrackingJob(
   request: Pick<AnalysisRequestPayload, 'clip' | 'mode' | 'profile' | 'playerSelection'>,
   signal?: AbortSignal
 ): Promise<string> {
-  const url = analysisEndpoint('/api/tracking/jobs');
+  const urlOpts = { videoUri: request.clip.uri };
+  const url = analysisEndpoint('/api/tracking/jobs', urlOpts);
   const fileName = inferFileName(request.clip.fileName);
   const mimeType = inferMimeType(request.clip.fileName);
   const metadata = toRequestMetadata({ ...request, question: '', context: null });
@@ -165,7 +166,7 @@ export async function createTrackingJob(
     type: mimeType,
   } as unknown as Blob);
 
-  logAnalysisApiTarget('POST', '/api/tracking/jobs');
+  logAnalysisApiTarget('POST', '/api/tracking/jobs', urlOpts);
 
   const res = await fetch(url, { method: 'POST', body: formData, signal });
   if (!res.ok) {

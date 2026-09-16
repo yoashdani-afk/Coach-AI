@@ -6,9 +6,9 @@ import { analysesResetLabel } from '@/lib/analysisCredits';
 interface UsageAnalysesCardProps {
   remaining: number;
   unlimited: boolean;
-  /** Monthly cap (free 3 / Pro 12). Defaults to free tier. */
+  /** Monthly cap (free 1 / Pro 12). Defaults to free tier. */
   limit?: number;
-  /** UTC period end date YYYY-MM-DD from Supabase. */
+  /** Period end date YYYY-MM-DD from Supabase (anniversary reset). */
   periodEnd?: string | null;
   /**
    * `home` — fuller helper copy (upload uses one analysis / reset messaging).

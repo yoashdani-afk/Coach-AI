@@ -3,7 +3,7 @@ import { isDevForcePro } from '@/lib/entitlements';
 
 interface EntitlementState {
   /**
-   * Active `pro` entitlement from RevenueCat CustomerInfo.
+   * Active `football_dani_app_pro` entitlement from RevenueCat CustomerInfo.
    * False until SDK reports otherwise (or DEV_FORCE_PRO).
    */
   hasProEntitlement: boolean;

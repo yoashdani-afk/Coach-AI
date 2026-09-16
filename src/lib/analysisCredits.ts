@@ -1,9 +1,14 @@
 import { FREE_TIER_ANALYSES_PER_MONTH } from '@/lib/constants';
 import type { PlayerProfile } from '@/types/profile';
 
-/** Development builds never consume or enforce free-tier limits. */
+/**
+ * Development builds skip free-tier analysis enforcement by default.
+ * Set EXPO_PUBLIC_DEV_SIMULATE_FREE_TIER=1 to preview real free-tier limits / paywall
+ * while still running a __DEV__ build. Production ignores this (always enforces).
+ */
 export function isDevUnlimitedAnalyses(): boolean {
-  return __DEV__;
+  if (!__DEV__) return false;
+  return process.env.EXPO_PUBLIC_DEV_SIMULATE_FREE_TIER !== '1';
 }
 
 export function createAnalysisAttemptId(): string {
@@ -58,15 +63,15 @@ export function remainingAnalysesLabel(
   return `${remaining} of ${monthlyLimit} analyses left this month`;
 }
 
-/** UTC calendar month end label for UI (matches Supabase rollover). */
+/** UTC anniversary period-end label for UI (matches Supabase rollover). */
 export function analysesResetLabel(periodEndIsoDate: string | null | undefined): string {
   if (!periodEndIsoDate) {
-    return 'Limits reset on the 1st of each month (UTC).';
+    return 'Limits reset one month from your period start.';
   }
   try {
     const d = new Date(`${periodEndIsoDate}T00:00:00.000Z`);
     if (Number.isNaN(d.getTime())) {
-      return 'Limits reset on the 1st of each month (UTC).';
+      return 'Limits reset one month from your period start.';
     }
     const label = d.toLocaleDateString('en-GB', {
       day: 'numeric',
@@ -74,8 +79,8 @@ export function analysesResetLabel(periodEndIsoDate: string | null | undefined):
       year: 'numeric',
       timeZone: 'UTC',
     });
-    return `Resets ${label} (UTC)`;
+    return `Resets ${label}`;
   } catch {
-    return 'Limits reset on the 1st of each month (UTC).';
+    return 'Limits reset one month from your period start.';
   }
 }

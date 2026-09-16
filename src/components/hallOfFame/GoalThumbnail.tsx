@@ -65,8 +65,12 @@ function VideoGoalThumbnail({
       hasSeeked.current = true;
       const maxSec = Math.max(0, durationSec - 0.05);
       const targetSec = Math.min(maxSec, Math.max(0, timestampMs / 1000));
-      player.currentTime = targetSec;
-      player.pause();
+      try {
+        player.currentTime = targetSec;
+        player.pause();
+      } catch {
+        // Player may be released while the list recycles cells.
+      }
     };
 
     if (player.duration > 0) {
@@ -88,6 +92,12 @@ function VideoGoalThumbnail({
     return () => {
       statusSub.remove();
       sourceSub.remove();
+      try {
+        player.pause();
+      } catch {
+        // ignore
+      }
+      void player.replaceAsync(null).catch(() => {});
     };
   }, [player, timestampMs]);
 

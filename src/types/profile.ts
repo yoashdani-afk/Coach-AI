@@ -81,7 +81,7 @@ export interface PlayerProfile {
   feedbackAreas: FeedbackArea[];
   isComplete: boolean;
   analysesUsedThisMonth: number;
-  /** UTC date (YYYY-MM-DD) when the current analyses period ends (exclusive / next month start). */
+  /** Date (YYYY-MM-DD) when the current anniversary analysis period ends (next reset). */
   analysesPeriodEnd?: string | null;
   updatedAt: string;
 }

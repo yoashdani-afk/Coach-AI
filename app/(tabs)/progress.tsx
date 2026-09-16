@@ -38,8 +38,12 @@ export default function ProgressScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title="Progress" subtitle="Your coaching reports and activity" />
       <ScrollView
-        className="px-4"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24, gap: 16 }}
+        style={{ flex: 1 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: insets.bottom + 24,
+          gap: 16,
+        }}
         showsVerticalScrollIndicator={false}
       >
         <View className="flex-row items-center gap-2.5 px-0.5 pt-1">
@@ -51,13 +55,17 @@ export default function ProgressScreen() {
           </Text>
         </View>
 
-        <View className="flex-row gap-3 items-stretch">
-          <ProgressClipsStatCard count={reports.length} />
+        <View className="flex-row gap-3 items-start">
+          <View className="flex-1">
+            <ProgressClipsStatCard count={reports.length} />
+          </View>
           {latest ? (
-            <ProgressLatestStatCard
-              report={latest}
-              onPress={() => router.push(`/report/${latest.id}`)}
-            />
+            <View className="flex-1">
+              <ProgressLatestStatCard
+                report={latest}
+                onPress={() => router.push(`/report/${latest.id}`)}
+              />
+            </View>
           ) : null}
         </View>
 

@@ -104,7 +104,7 @@ export const FEEDBACK_AREAS: { value: FeedbackArea; label: string }[] = [
   { value: 'FOOTBALL_IQ', label: 'Football IQ' },
 ];
 
-export const FREE_TIER_ANALYSES_PER_MONTH = 3;
+export const FREE_TIER_ANALYSES_PER_MONTH = 1;
 
 export const MIN_CLIP_DURATION_MS = 10_000;
 export const MAX_CLIP_DURATION_MS = 5 * 60 * 1000;

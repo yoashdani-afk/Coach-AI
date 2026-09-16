@@ -6,6 +6,7 @@ import { PlayerSelectionFrame } from '@/components/analysis/PlayerSelectionFrame
 import { Button } from '@/components/ui';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { buildSingleReferenceProfile } from '@/lib/identityProfile';
+import { isLocalSimulator } from '@/lib/analysisConfig';
 import { useUploadStore } from '@/stores/uploadStore';
 import type { PlayerSelection } from '@/types/analysis';
 
@@ -23,7 +24,10 @@ export default function IdentifyPlayerScreen() {
   useEffect(() => {
     if (!clip || !analysisMode) {
       router.replace('/(upload)');
+      return;
     }
+    // Seed simulator→localhost routing for later analyse/tracking calls in this session.
+    isLocalSimulator(clip.uri);
   }, [clip, analysisMode, router]);
 
   if (!clip || !analysisMode) {

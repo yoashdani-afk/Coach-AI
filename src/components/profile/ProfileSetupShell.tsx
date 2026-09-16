@@ -15,6 +15,7 @@ interface ProfileSetupShellProps {
   onContinue: () => void;
   continueLabel?: string;
   continueDisabled?: boolean;
+  continueLoading?: boolean;
   showSkip?: boolean;
   onSkip?: () => void;
   children: React.ReactNode;
@@ -30,6 +31,7 @@ export function ProfileSetupShell({
   onContinue,
   continueLabel = 'Continue',
   continueDisabled = false,
+  continueLoading = false,
   showSkip = false,
   onSkip,
   children,
@@ -82,7 +84,14 @@ export function ProfileSetupShell({
         {footerHint ? (
           <Text className="text-text-muted text-sm text-center mb-3">{footerHint}</Text>
         ) : null}
-        <Button label={continueLabel} onPress={onContinue} disabled={continueDisabled} fullWidth size="lg" />
+        <Button
+          label={continueLabel}
+          onPress={onContinue}
+          disabled={continueDisabled}
+          loading={continueLoading}
+          fullWidth
+          size="lg"
+        />
         {showSkip && onSkip ? (
           <Button label="Skip for now" variant="ghost" onPress={onSkip} fullWidth className="mt-2" />
         ) : null}

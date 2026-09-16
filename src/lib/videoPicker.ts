@@ -83,7 +83,7 @@ export async function pickVideoFromLibrary(): Promise<PickVideoResult> {
     if (!hasMediaLibraryAccess(permission)) {
       Alert.alert(
         'Permission needed',
-        'Coach AI needs access to your photo library to select a clip for analysis.',
+        'GoalX needs access to your photo library to select a clip for analysis.',
         [
           { text: 'Cancel', style: 'cancel' },
           {

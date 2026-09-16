@@ -297,4 +297,4 @@ See `06-CV-PIPELINE.md` for when structured CV data augments (not replaces) the 
 | Beta (100 users, ~3 clips each) | 300 | $30 | $25 | $55 |
 | Launch | 1,000 | $100 | $25 | $125 |
 
-**Free tier:** 3 analyses/month per user. Beta testers can receive manual bonus credits via `profiles.analyses_bonus_credits`.
+**Free tier:** 1 analysis/month per user. Beta testers can receive manual bonus credits via `profiles.analyses_bonus_credits`.

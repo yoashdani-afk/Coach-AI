@@ -582,7 +582,7 @@ export default function AnalysingScreen() {
               maxWidth: 320,
             }}
           >
-            {isAnalysisApiConfigured
+            {isAnalysisApiConfigured()
               ? 'This usually takes under a minute — keep this screen open while AI analysis runs.'
               : 'Analysis server is not configured. Check EXPO_PUBLIC_ANALYSIS_API_URL.'}
           </Text>

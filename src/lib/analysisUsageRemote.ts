@@ -81,3 +81,57 @@ export async function consumeAnalysisCreditRemote(
     usage,
   };
 }
+
+export type ResetMyAnalysisUsageResult =
+  | { ok: true; usage: AnalysisUsageSnapshot }
+  | { ok: false; message: string };
+
+/** Resets the signed-in user's own analyses_used_this_month via SECURITY DEFINER RPC. */
+export async function resetMyAnalysisUsageRemote(
+  monthlyLimit: number = FREE_TIER_ANALYSES_PER_MONTH
+): Promise<ResetMyAnalysisUsageResult> {
+  if (!isSupabaseConfigured) {
+    return { ok: false, message: 'Supabase is not configured.' };
+  }
+
+  const { data, error } = await getSupabase().rpc('reset_my_analysis_usage', {
+    p_monthly_limit: monthlyLimit,
+  });
+
+  if (error) {
+    console.warn('[Credits] reset_my_analysis_usage failed', error.message);
+    return { ok: false, message: error.message };
+  }
+
+  const usage = parseUsage(data);
+  if (!usage) {
+    return { ok: false, message: 'Invalid usage response.' };
+  }
+
+  return { ok: true, usage };
+}
+
+/**
+ * Align the signed-in user's analysis period to an anniversary anchor (UTC date YYYY-MM-DD).
+ * Pass resetUsed=true when Pro first activates so they get a full Pro allotment.
+ */
+export async function syncAnalysisPeriodAnchorRemote(
+  anchorIsoDate: string,
+  resetUsed: boolean,
+  monthlyLimit: number = FREE_TIER_ANALYSES_PER_MONTH
+): Promise<AnalysisUsageSnapshot | null> {
+  if (!isSupabaseConfigured) return null;
+
+  const { data, error } = await getSupabase().rpc('sync_analysis_period_anchor', {
+    p_anchor: anchorIsoDate,
+    p_reset_used: resetUsed,
+    p_monthly_limit: monthlyLimit,
+  });
+
+  if (error) {
+    console.warn('[Credits] sync_analysis_period_anchor failed', error.message);
+    return null;
+  }
+
+  return parseUsage(data);
+}

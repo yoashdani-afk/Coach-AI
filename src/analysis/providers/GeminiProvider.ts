@@ -58,11 +58,12 @@ export async function analyseWithGemini(
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    logAnalysisApiTarget('POST', ANALYSE_PATH);
+    const urlOpts = { videoUri: request.clip.uri };
+    logAnalysisApiTarget('POST', ANALYSE_PATH, urlOpts);
 
     let response: Response;
     try {
-      response = await fetch(analysisEndpoint(ANALYSE_PATH), {
+      response = await fetch(analysisEndpoint(ANALYSE_PATH, urlOpts), {
         method: 'POST',
         body: formData,
         signal: controller.signal,

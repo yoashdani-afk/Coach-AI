@@ -453,7 +453,7 @@ function AnalysisStage({ active, reducedMotion }: { active: boolean; reducedMoti
                 textTransform: 'uppercase',
               }}
             >
-              AI Coach
+              GoalX
             </Text>
           </View>
           <View

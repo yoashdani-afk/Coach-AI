@@ -212,7 +212,7 @@ These were in v1 plan but removed from MVP:
 | 10-FEATURE-CHECKLIST.md (v2.0) | ✅ Updated — awaiting approval |
 
 ### Decisions (Final)
-- **Monetisation:** 3 free analyses/month; manual beta credits; subscriptions post-validation
+- **Monetisation:** 1 free analysis/month; manual beta credits; subscriptions post-validation
 - **Sharing:** Deferred post-MVP (image export + share links later)
 - **Brand:** Coach AI (working name); trademark review before public launch
 - **Recording:** Camera roll only for MVP
