@@ -6,6 +6,7 @@ WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
+    ffmpeg \
     python3 \
     make \
     g++ \
@@ -17,6 +18,8 @@ RUN npm ci
 COPY server/ ./
 
 ENV NODE_ENV=production
+# System ffmpeg includes libx264 (required for analysis video normalize).
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
 EXPOSE 3001
 
 CMD ["npx", "tsx", "index.ts"]
