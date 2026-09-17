@@ -12,7 +12,10 @@ import Purchases, {
 import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 import { getAnalysisLimit } from '@/lib/entitlements';
 import { syncAnalysisPeriodAnchorRemote } from '@/lib/analysisUsageRemote';
-import { useEntitlementStore } from '@/stores/entitlementStore';
+import {
+  useEntitlementStore,
+  waitForEntitlementHydration,
+} from '@/stores/entitlementStore';
 import { useProfileStore } from '@/stores/profileStore';
 
 /** Must match the entitlement identifier in the RevenueCat dashboard. */
@@ -138,32 +141,37 @@ function proPurchaseAnchorDate(info: CustomerInfo): string {
 }
 
 /** Last Pro purchase date we synced into Supabase (avoids resetting usage every refresh). */
-let lastSyncedProPurchaseAnchor: string | null = null;
+// Persisted on useEntitlementStore.lastSyncedProPurchaseAnchor — not a module global
+// (module globals reset to null on every cold start and wiped Pro usage).
 
 function applyCustomerInfo(info: CustomerInfo): boolean {
-  const wasPro = useEntitlementStore.getState().hasProEntitlement;
+  const entitlement = useEntitlementStore.getState();
   const active = hasActiveProEntitlement(info);
-  useEntitlementStore.getState().setHasProEntitlement(active);
-  useEntitlementStore.getState().setLastError(null);
+  entitlement.setHasProEntitlement(active);
+  entitlement.setLastError(null);
 
   void (async () => {
     if (active) {
       const anchor = proPurchaseAnchorDate(info);
-      const newlyPro = !wasPro;
-      const purchaseChanged = lastSyncedProPurchaseAnchor !== anchor;
-      if (newlyPro || purchaseChanged) {
-        // New subscribe → reset. Renewal (purchase date advanced) → reset.
-        // First sync after app update → re-anchor only (don't wipe usage).
-        const resetUsed =
-          newlyPro || (purchaseChanged && lastSyncedProPurchaseAnchor != null);
-        await syncAnalysisPeriodAnchorRemote(anchor, resetUsed, getAnalysisLimit(true));
-        lastSyncedProPurchaseAnchor = anchor;
+      const lastSynced = useEntitlementStore.getState().lastSyncedProPurchaseAnchor;
+
+      if (lastSynced === anchor) {
+        // Same purchase period as last sync — never wipe usage on relaunch.
+        await useProfileStore.getState().refreshAnalysisUsage(getAnalysisLimit(true));
+        return;
       }
+
+      // New anchor: first sync on this install → re-anchor only.
+      // Purchase date changed (renewal / re-subscribe) → reset usage for a fresh allotment.
+      const resetUsed = lastSynced != null;
+      await syncAnalysisPeriodAnchorRemote(anchor, resetUsed, getAnalysisLimit(true));
+      useEntitlementStore.getState().setLastSyncedProPurchaseAnchor(anchor);
+      console.log('[Credits] Pro period sync', { anchor, lastSynced, resetUsed });
       await useProfileStore.getState().refreshAnalysisUsage(getAnalysisLimit(true));
       return;
     }
 
-    lastSyncedProPurchaseAnchor = null;
+    useEntitlementStore.getState().setLastSyncedProPurchaseAnchor(null);
     await useProfileStore.getState().refreshAnalysisUsage(getAnalysisLimit(false));
   })();
 
@@ -197,6 +205,9 @@ export async function configureRevenueCat(): Promise<void> {
       );
       return;
     }
+
+    // Wait so cold start does not treat returning Pro as newlyPro (usage wipe).
+    await waitForEntitlementHydration();
 
     if (__DEV__) {
       // WARN avoids flooding LogBox with expected empty-offering noise during dashboard setup.
@@ -248,6 +259,7 @@ export async function logOutRevenueCatUser(): Promise<void> {
   } catch (err) {
     console.warn('[RevenueCat] logOut failed', err);
     useEntitlementStore.getState().setHasProEntitlement(false);
+    useEntitlementStore.getState().setLastSyncedProPurchaseAnchor(null);
   }
 }
 
