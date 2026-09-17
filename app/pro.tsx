@@ -32,7 +32,6 @@ import {
   purchaseProPlan,
   type ProPlan,
   type ProPlanKind,
-  restoreProPurchases,
 } from '@/lib/revenueCat';
 
 type PaywallReason = 'analyses' | 'hof' | 'weekly' | 'default';
@@ -99,7 +98,7 @@ function reasonCopy(reason: PaywallReason): { eyebrow: string; headline: string 
     case 'analyses':
       return {
         eyebrow: 'Monthly limit reached',
-        headline: 'Keep analysing with Pro',
+        headline: 'Train like the pros',
       };
     case 'hof':
       return {
@@ -109,12 +108,12 @@ function reasonCopy(reason: PaywallReason): { eyebrow: string; headline: string 
     case 'weekly':
       return {
         eyebrow: 'Weekly Regimen',
-        headline: 'Train Like the Pros',
+        headline: 'Train like the pros',
       };
     default:
       return {
         eyebrow: 'GoalX Pro',
-        headline: 'Level up your coaching',
+        headline: 'Train like the pros',
       };
   }
 }
@@ -168,9 +167,7 @@ export default function ProScreen() {
   const [livePlans, setLivePlans] = useState<ProPlan[]>([]);
   const [plansLoading, setPlansLoading] = useState(canPurchase);
   const [selectedKind, setSelectedKind] = useState<ProPlanKind>('monthly');
-  const [busyAction, setBusyAction] = useState<'subscribe' | 'restore' | 'manage' | null>(
-    null
-  );
+  const [busyAction, setBusyAction] = useState<'subscribe' | 'manage' | null>(null);
 
   const loadPlans = useCallback(async () => {
     if (!canPurchase) {
@@ -246,25 +243,11 @@ export default function ProScreen() {
     }
   };
 
-  const handleRestore = async () => {
-    setBusyAction('restore');
-    try {
-      const result = await restoreProPurchases();
-      if (result.restored) {
-        showNotice('Restored', 'Your Pro access is back on this device.');
-        return;
-      }
-      showNotice('Nothing to restore', result.message ?? 'No Pro subscription found.');
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
   const handleManage = async () => {
     if (!canManage) {
       showNotice(
         'Manage on mobile',
-        'Open GoalX on iOS or Android to change, cancel, or restore your subscription.'
+        'Open GoalX on iOS or Android to change or cancel your subscription.'
       );
       return;
     }
@@ -473,16 +456,6 @@ export default function ProScreen() {
             fullWidth
             size="lg"
           />
-          {canPurchase ? (
-            <Button
-              label="Restore purchases"
-              variant="ghost"
-              onPress={() => void handleRestore()}
-              loading={busyAction === 'restore'}
-              disabled={busyAction !== null}
-              fullWidth
-            />
-          ) : null}
           <Button label="Not now" variant="ghost" onPress={leavePaywall} fullWidth />
         </View>
       </View>

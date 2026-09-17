@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, View, Text, Alert, Pressable, Platform } from 'react-native';
+import { ScrollView, View, Text, Alert, Pressable, Platform, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -37,6 +37,7 @@ const FOCUS_BLUE = '#5B8DEF';
 const EXPERIENCE_TEAL = '#2DD4BF';
 const STYLE_VIOLET = '#A78BFA';
 const WARNING_AMBER = '#FFB300';
+const SUPPORT_EMAIL = 'dan@blsl.net';
 
 type IoniconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -140,10 +141,8 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const profile = useProfileStore((s) => s.profile);
-  const resetAll = useProfileStore((s) => s.resetAll);
   const clearProfile = useProfileStore((s) => s.clearProfile);
   const setSignedIn = useProfileStore((s) => s.setSignedIn);
-  const resetMyAnalysisUsage = useProfileStore((s) => s.resetMyAnalysisUsage);
   const analysesMonthlyLimit = useProfileStore((s) => s.analysesMonthlyLimit);
   const isPro = useIsPro();
   const effectiveLimit = Math.max(analysesMonthlyLimit, getAnalysisLimit(isPro));
@@ -163,57 +162,10 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleResetMyAnalyses = () => {
-    const run = async () => {
-      const result = await resetMyAnalysisUsage(effectiveLimit);
-      if (!result.ok) {
-        showAlert('Reset failed', result.message);
-        return;
-      }
-      showAlert(
-        'Analyses reset',
-        `Your account usage is back to 0 / ${effectiveLimit} for the current period.`
-      );
-    };
-
-    if (Platform.OS === 'web') {
-      if (
-        confirmAction(
-          'Reset my analyses',
-          `Reset your Supabase analyses counter to 0 for this account? Limit shown: ${effectiveLimit}/month.`
-        )
-      ) {
-        void run();
-      }
-      return;
-    }
-
-    Alert.alert(
-      'Reset my analyses',
-      `Resets your remote Supabase counter (this account only). Limit shown: ${effectiveLimit}/month.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Reset', onPress: () => void run() },
-      ]
-    );
-  };
-
-  const handleReset = () => {
-    Alert.alert(
-      'Reset profile',
-      'This clears your local profile and restarts onboarding. Use this for testing.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => {
-            resetAll();
-            router.replace('/(onboarding)/welcome');
-          },
-        },
-      ]
-    );
+  const handleContactUs = () => {
+    void Linking.openURL(`mailto:${SUPPORT_EMAIL}`).catch(() => {
+      showAlert('Contact us', SUPPORT_EMAIL);
+    });
   };
 
   const performSignOut = async () => {
@@ -382,7 +334,7 @@ export default function ProfileScreen() {
                 </Text>
                 <Text className="text-text-secondary text-sm mt-1 leading-5">
                   {isPro
-                    ? 'Manage billing, restore purchases, or change plans.'
+                    ? 'Manage billing or change plans.'
                     : 'More analyses, Hall of Fame slots, and the full weekly regimen.'}
                 </Text>
               </View>
@@ -516,24 +468,13 @@ export default function ProfileScreen() {
             fullWidth
             onPress={() => router.push('/(onboarding)/setup?edit=1')}
           />
-          {__DEV__ ? (
-            <>
-              <Button
-                label="Reset my analyses"
-                variant="secondary"
-                fullWidth
-                onPress={handleResetMyAnalyses}
-              />
-              <Button
-                label="Marker preview (debug)"
-                variant="secondary"
-                fullWidth
-                onPress={() => router.push('/debug/marker-preview')}
-              />
-            </>
-          ) : null}
+          <Button
+            label="Contact us"
+            variant="secondary"
+            fullWidth
+            onPress={handleContactUs}
+          />
           <Button label="Sign out" variant="ghost" fullWidth onPress={handleSignOut} />
-          <Button label="Reset profile (testing)" variant="ghost" fullWidth onPress={handleReset} />
         </View>
 
         <Card variant="outlined" className="overflow-hidden">
