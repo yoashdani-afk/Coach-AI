@@ -7,8 +7,8 @@ export const FREE_HOF_ENTRY_LIMIT = 1;
 export const PRO_HOF_ENTRY_LIMIT = 3;
 
 /** Fallback marketing prices when store offerings have not loaded yet. */
-export const PRO_MONTHLY_PRICE_LABEL = '€4.99';
-export const PRO_YEARLY_PRICE_LABEL = '€44.99';
+export const PRO_MONTHLY_PRICE_LABEL = '€5.99';
+export const PRO_YEARLY_PRICE_LABEL = '€49.99';
 /** @deprecated Prefer PRO_MONTHLY_PRICE_LABEL */
 export const PRO_PRICE_LABEL = PRO_MONTHLY_PRICE_LABEL;
 
