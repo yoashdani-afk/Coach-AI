@@ -120,6 +120,47 @@ export default function HallOfFameTabScreen() {
           </View>
         ) : (
           <>
+            {highestRated.length > 0 ? (
+              <Section
+                title="Global Leaderboard"
+                subtitle="Top 100 by score · all players"
+                tone="global"
+                icon="globe"
+              >
+                <View className="gap-2.5">
+                  {highestRated.map((entry) => {
+                    const isOwn =
+                      currentUserId != null &&
+                      entry.submission.ownerUserId === currentUserId;
+                    return (
+                      <HallOfFameGoalCard
+                        key={entryKey(entry.submission.id, 'global')}
+                        entry={entry}
+                        compact
+                        isOwn={isOwn}
+                        variant="global"
+                        onPress={() => router.push(`/hall-of-fame/${entry.submission.id}`)}
+                      />
+                    );
+                  })}
+                </View>
+              </Section>
+            ) : !showInitialLoading && !error && session ? (
+              <View
+                style={{
+                  backgroundColor: SURFACE,
+                  borderWidth: 1,
+                  borderColor: BORDER,
+                  borderRadius: RADIUS,
+                  padding: 20,
+                }}
+              >
+                <Text className="text-text-secondary text-sm text-center leading-5">
+                  The global leaderboard is empty. Be the first to induct a Goal-mode play.
+                </Text>
+              </View>
+            ) : null}
+
             {session && userSubmissionCount === 0 && !error ? (
               <View
                 style={{
@@ -180,47 +221,6 @@ export default function HallOfFameTabScreen() {
                   ))}
                 </View>
               </Section>
-            ) : null}
-
-            {highestRated.length > 0 ? (
-              <Section
-                title="Global Leaderboard"
-                subtitle="Top 100 by score · all players"
-                tone="global"
-                icon="globe"
-              >
-                <View className="gap-2.5">
-                  {highestRated.map((entry) => {
-                    const isOwn =
-                      currentUserId != null &&
-                      entry.submission.ownerUserId === currentUserId;
-                    return (
-                      <HallOfFameGoalCard
-                        key={entryKey(entry.submission.id, 'global')}
-                        entry={entry}
-                        compact
-                        isOwn={isOwn}
-                        variant="global"
-                        onPress={() => router.push(`/hall-of-fame/${entry.submission.id}`)}
-                      />
-                    );
-                  })}
-                </View>
-              </Section>
-            ) : !showInitialLoading && !error && session ? (
-              <View
-                style={{
-                  backgroundColor: SURFACE,
-                  borderWidth: 1,
-                  borderColor: BORDER,
-                  borderRadius: RADIUS,
-                  padding: 20,
-                }}
-              >
-                <Text className="text-text-secondary text-sm text-center leading-5">
-                  The global leaderboard is empty. Be the first to induct a Goal-mode play.
-                </Text>
-              </View>
             ) : null}
 
             {hasHydrated && !isLoading ? (
