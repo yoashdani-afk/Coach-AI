@@ -292,11 +292,6 @@ export function PlayerSelectionFrame({
     };
   }, [markerVisible, thumbnailRect, normalized, selectionFrame]);
 
-  const trackingQualityWarning = useMemo(() => {
-    if (!normalized || thumbnailRect.width <= 0) return false;
-    return assessTrackingQuality(normalized.x, normalized.y, thumbnailRect);
-  }, [normalized, thumbnailRect]);
-
   const zoomPreviewLayout = useMemo(() => {
     if (thumbnailRect.width <= 0 || thumbnailRect.height <= 0) {
       return { width: 112, height: 112 };
@@ -615,39 +610,6 @@ export function PlayerSelectionFrame({
           <Text className="text-text-muted text-xs text-center leading-5">
             Tap again on the main frame to adjust your selection, or scrub to a clearer moment.
           </Text>
-        </Card>
-      ) : null}
-
-      {trackingQualityWarning ? (
-        <Card variant="outlined" className="gap-3 border-amber-500/40 bg-amber-500/5">
-          <Text className="text-amber-200 text-sm font-semibold leading-5">
-            Player is difficult to identify in this frame. Choose a clearer moment for more accurate
-            tracking.
-          </Text>
-          <Text className="text-text-secondary text-sm leading-5">
-            You can pick a different moment, tap again to refine your selection, or continue with
-            reduced tracking confidence.
-          </Text>
-          <View className="flex-row gap-2">
-            <Button
-              label="Choose clearer moment"
-              variant="secondary"
-              size="sm"
-              className="flex-1"
-              onPress={() => setShowScrubber(true)}
-            />
-            <Button
-              label="Continue anyway"
-              size="sm"
-              className="flex-1"
-              onPress={() => {
-                setReducedTrackingConfidence(true);
-                if (normalized && selectionFrame) {
-                  emitSelection(normalized, selectionFrame.timestampMs, true);
-                }
-              }}
-            />
-          </View>
         </Card>
       ) : null}
 
