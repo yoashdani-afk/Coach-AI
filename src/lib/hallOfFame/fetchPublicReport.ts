@@ -11,11 +11,13 @@ export type FetchHallOfFamePublicReportResult =
       report: GoalReport;
       playTitle: string;
       playerName: string;
+      ownerUserId?: string;
     }
   | {
       status: 'unavailable';
       playTitle: string;
       playerName: string;
+      ownerUserId?: string;
     }
   | { status: 'not_found' }
   | { status: 'error'; message: string };
@@ -34,7 +36,7 @@ export async function fetchHallOfFamePublicReport(
   try {
     const { data, error } = await getSupabase()
       .from('hall_of_fame_entries')
-      .select('id, play_title, player_name, report_snapshot')
+      .select('id, play_title, player_name, report_snapshot, user_id')
       .eq('id', entryId)
       .maybeSingle();
 
@@ -47,10 +49,11 @@ export async function fetchHallOfFamePublicReport(
 
     const playTitle = typeof data.play_title === 'string' ? data.play_title : 'Hall of Fame play';
     const playerName = typeof data.player_name === 'string' ? data.player_name : 'Player';
+    const ownerUserId = typeof data.user_id === 'string' ? data.user_id : undefined;
     const snapshot = parsePublicGoalReportSnapshot(data.report_snapshot);
 
     if (!snapshot) {
-      return { status: 'unavailable', playTitle, playerName };
+      return { status: 'unavailable', playTitle, playerName, ownerUserId };
     }
 
     return {
@@ -58,6 +61,7 @@ export async function fetchHallOfFamePublicReport(
       report: snapshotToGoalReport(snapshot),
       playTitle,
       playerName,
+      ownerUserId,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to load Hall of Fame report';

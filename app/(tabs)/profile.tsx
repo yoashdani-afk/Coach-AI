@@ -21,6 +21,12 @@ import {
   formatWeightForDisplay,
 } from '@/lib/profileUtils';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { deleteOwnAccount } from '@/lib/deleteAccount';
+import {
+  openExternalUrl,
+  PRIVACY_POLICY_URL,
+  TERMS_OF_USE_URL,
+} from '@/lib/ugcSafety';
 import {
   canManageProOnThisPlatform,
   logOutRevenueCatUser,
@@ -152,6 +158,7 @@ export default function ProfileScreen() {
   const needsCompletion = profileNeedsCompletion(profile);
   const canManagePro = canManageProOnThisPlatform();
   const [managingSubscription, setManagingSubscription] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const handleManageSubscription = async () => {
     setManagingSubscription(true);
@@ -203,6 +210,59 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const DELETE_ACCOUNT_MESSAGE =
+    'This permanently deletes your GoalX account, profile, analysis history, and Hall of Fame uploads. This cannot be undone.\n\nIf you have an App Store subscription, cancel it in Settings → Apple ID → Subscriptions — deleting your account does not cancel billing.';
+
+  const performDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      await deleteOwnAccount();
+      router.replace('/(onboarding)/welcome');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Something went wrong.';
+      showAlert('Could not delete account', message);
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    if (Platform.OS === 'web') {
+      if (
+        confirmAction('Delete account?', DELETE_ACCOUNT_MESSAGE) &&
+        confirmAction(
+          'Confirm deletion',
+          'Type OK to permanently delete your account and all associated data.'
+        )
+      ) {
+        void performDeleteAccount();
+      }
+      return;
+    }
+
+    Alert.alert('Delete account?', DELETE_ACCOUNT_MESSAGE, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Continue',
+        style: 'destructive',
+        onPress: () => {
+          Alert.alert(
+            'Delete permanently?',
+            'Your account and data will be removed immediately.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Delete account',
+                style: 'destructive',
+                onPress: () => void performDeleteAccount(),
+              },
+            ]
+          );
+        },
+      },
+    ]);
+  };
+
   if (!profile) {
     return (
       <View className="flex-1 bg-background">
@@ -225,6 +285,14 @@ export default function ProfileScreen() {
               fullWidth
             />
             <Button label="Sign out" variant="ghost" fullWidth onPress={handleSignOut} />
+            <Button
+              label="Delete account"
+              variant="ghost"
+              fullWidth
+              loading={deletingAccount}
+              disabled={deletingAccount}
+              onPress={handleDeleteAccount}
+            />
           </Card>
         </View>
       </View>
@@ -475,22 +543,40 @@ export default function ProfileScreen() {
             onPress={handleContactUs}
           />
           <Button label="Sign out" variant="ghost" fullWidth onPress={handleSignOut} />
-        </View>
-
-        <Card variant="outlined" className="overflow-hidden">
-          <Pressable className="flex-row items-center justify-between py-1 active:opacity-70">
-            <View className="flex-row items-center gap-3">
-              <View className="w-9 h-9 rounded-xl bg-surface-elevated items-center justify-center">
-                <Ionicons name="settings-outline" size={18} color="#A0A0A8" />
-              </View>
-              <Text className="text-text-primary font-medium">Settings</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#6B6B73" />
+          <Pressable
+            accessibilityRole="button"
+            disabled={deletingAccount}
+            onPress={handleDeleteAccount}
+            className="py-3.5 items-center active:opacity-70"
+          >
+            <Text className="font-semibold" style={{ color: '#FF5252' }}>
+              {deletingAccount ? 'Deleting account…' : 'Delete account'}
+            </Text>
           </Pressable>
-          <Text className="text-text-muted text-xs mt-2 leading-4">
-            Notifications, account, and preferences — coming soon.
-          </Text>
-        </Card>
+          <View className="flex-row items-center justify-center gap-3 flex-wrap pt-1">
+            <Pressable
+              onPress={() =>
+                void openExternalUrl(PRIVACY_POLICY_URL).catch(() =>
+                  showAlert('Privacy Policy', PRIVACY_POLICY_URL)
+                )
+              }
+              className="active:opacity-70"
+            >
+              <Text className="text-primary text-xs font-semibold">Privacy Policy</Text>
+            </Pressable>
+            <Text className="text-text-muted text-xs">·</Text>
+            <Pressable
+              onPress={() =>
+                void openExternalUrl(TERMS_OF_USE_URL).catch(() =>
+                  showAlert('Terms of Use', TERMS_OF_USE_URL)
+                )
+              }
+              className="active:opacity-70"
+            >
+              <Text className="text-primary text-xs font-semibold">Terms of Use</Text>
+            </Pressable>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );

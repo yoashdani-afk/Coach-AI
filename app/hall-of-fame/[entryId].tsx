@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, View, Text } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ReportDetailView } from '@/components/analysis/ReportDetailView';
@@ -9,14 +9,42 @@ import {
   fetchHallOfFamePublicReport,
   type FetchHallOfFamePublicReportResult,
 } from '@/lib/hallOfFame/fetchPublicReport';
+import {
+  blockUser,
+  markEntryReported,
+  submitUgcReport,
+  type UgcReportReason,
+} from '@/lib/ugcSafety';
+import { useAuthStore } from '@/stores/authStore';
+import { hallOfFameService } from '@/services/hallOfFame/hallOfFameService';
 import type { GoalReport } from '@/types/analysis';
 
 type LoadState =
-  | { phase: 'loading' }
-  | { phase: 'ready'; report: GoalReport; playTitle: string; playerName: string }
-  | { phase: 'unavailable'; playTitle: string; playerName: string }
+  | {
+      phase: 'loading';
+    }
+  | {
+      phase: 'ready';
+      report: GoalReport;
+      playTitle: string;
+      playerName: string;
+      ownerUserId?: string;
+    }
+  | {
+      phase: 'unavailable';
+      playTitle: string;
+      playerName: string;
+      ownerUserId?: string;
+    }
   | { phase: 'not_found' }
   | { phase: 'error'; message: string };
+
+const REPORT_REASONS: UgcReportReason[] = [
+  'Inappropriate content',
+  'Harassment or bullying',
+  'Spam or misleading',
+  'Other',
+];
 
 function toLoadState(result: FetchHallOfFamePublicReportResult): LoadState {
   switch (result.status) {
@@ -26,12 +54,14 @@ function toLoadState(result: FetchHallOfFamePublicReportResult): LoadState {
         report: result.report,
         playTitle: result.playTitle,
         playerName: result.playerName,
+        ownerUserId: result.ownerUserId,
       };
     case 'unavailable':
       return {
         phase: 'unavailable',
         playTitle: result.playTitle,
         playerName: result.playerName,
+        ownerUserId: result.ownerUserId,
       };
     case 'not_found':
       return { phase: 'not_found' };
@@ -40,11 +70,22 @@ function toLoadState(result: FetchHallOfFamePublicReportResult): LoadState {
   }
 }
 
+function showNotice(title: string, message?: string) {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') {
+      window.alert(message ? `${title}\n\n${message}` : title);
+    }
+    return;
+  }
+  Alert.alert(title, message);
+}
+
 export default function HallOfFamePublicReportScreen() {
   const { entryId } = useLocalSearchParams<{ entryId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [state, setState] = useState<LoadState>({ phase: 'loading' });
+  const currentUserId = useAuthStore((s) => s.user?.id);
 
   const load = useCallback(async () => {
     if (!entryId || typeof entryId !== 'string') {
@@ -61,7 +102,6 @@ export default function HallOfFamePublicReportScreen() {
   }, [load]);
 
   const goBackToHallOfFame = () => {
-    // Defer navigation one tick so VideoPreview can detach the native player first.
     requestAnimationFrame(() => {
       if (router.canGoBack()) {
         router.back();
@@ -70,6 +110,141 @@ export default function HallOfFamePublicReportScreen() {
       router.replace('/(tabs)/hall-of-fame');
     });
   };
+
+  const ownerUserId =
+    state.phase === 'ready' || state.phase === 'unavailable' ? state.ownerUserId : undefined;
+  const playerName =
+    state.phase === 'ready' || state.phase === 'unavailable' ? state.playerName : '';
+  const playTitle =
+    state.phase === 'ready' || state.phase === 'unavailable' ? state.playTitle : '';
+  const isOwnEntry = Boolean(ownerUserId && currentUserId && ownerUserId === currentUserId);
+  const canModerate = Boolean(entryId) && !isOwnEntry;
+
+  const submitReport = async (reason: UgcReportReason) => {
+    if (!entryId || typeof entryId !== 'string') return;
+    try {
+      await submitUgcReport({
+        entryId,
+        playerName,
+        playTitle,
+        ownerUserId,
+        reason,
+      });
+      await hallOfFameService.refresh();
+      showNotice(
+        'Report submitted',
+        'Thanks — this content is hidden for you. Our team will review it in GoalX moderation.'
+      );
+      goBackToHallOfFame();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not submit report.';
+      showNotice('Report failed', message);
+    }
+  };
+
+  const handleReport = () => {
+    if (!canModerate) return;
+
+    if (Platform.OS === 'web') {
+      const reason = REPORT_REASONS[0];
+      if (
+        typeof window !== 'undefined' &&
+        window.confirm(`Report this content as “${reason}”?`)
+      ) {
+        void submitReport(reason);
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Report content',
+      'Why are you reporting this Hall of Fame entry?',
+      [
+        ...REPORT_REASONS.map((reason) => ({
+          text: reason,
+          onPress: () => void submitReport(reason),
+        })),
+        { text: 'Cancel', style: 'cancel' as const },
+      ]
+    );
+  };
+
+  const handleBlock = () => {
+    if (!canModerate || !ownerUserId) {
+      showNotice('Unable to block', 'This entry has no account to block.');
+      return;
+    }
+
+    const confirmAndBlock = async () => {
+      await blockUser(ownerUserId);
+      if (entryId && typeof entryId === 'string') {
+        await markEntryReported(entryId);
+      }
+      await hallOfFameService.refresh();
+      showNotice('User blocked', 'Their Hall of Fame posts are hidden for you.');
+      goBackToHallOfFame();
+    };
+
+    if (Platform.OS === 'web') {
+      if (
+        typeof window !== 'undefined' &&
+        window.confirm('Block this user? Their Hall of Fame posts will be hidden for you.')
+      ) {
+        void confirmAndBlock();
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Block user?',
+      'Their Hall of Fame posts will be hidden on this device. You can still report the content separately.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: () => void confirmAndBlock(),
+        },
+      ]
+    );
+  };
+
+  const moderationBar = canModerate ? (
+    <View
+      className="mx-4 mb-3 flex-row rounded-2xl overflow-hidden"
+      style={{
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.1)',
+        backgroundColor: 'rgba(255,255,255,0.04)',
+      }}
+    >
+      <Pressable
+        onPress={handleReport}
+        className="flex-1 py-3.5 items-center active:opacity-70"
+        accessibilityRole="button"
+        accessibilityLabel="Report content"
+      >
+        <Text className="font-semibold text-sm" style={{ color: '#FFB300' }}>
+          Report
+        </Text>
+      </Pressable>
+      {ownerUserId ? (
+        <>
+          <View style={{ width: 1, backgroundColor: 'rgba(255,255,255,0.1)' }} />
+          <Pressable
+            onPress={handleBlock}
+            className="flex-1 py-3.5 items-center active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel="Block user"
+          >
+            <Text className="font-semibold text-sm" style={{ color: '#FF5252' }}>
+              Block user
+            </Text>
+          </Pressable>
+        </>
+      ) : null}
+    </View>
+  ) : null;
 
   if (state.phase === 'loading') {
     return (
@@ -134,6 +309,7 @@ export default function HallOfFamePublicReportScreen() {
               {state.playTitle ? ` · ${state.playTitle}` : ''}
             </Text>
           ) : null}
+          {moderationBar}
           <Button label="Back to Hall of Fame" onPress={goBackToHallOfFame} fullWidth />
         </View>
       </View>
@@ -142,6 +318,7 @@ export default function HallOfFamePublicReportScreen() {
 
   const footer = (
     <View className="gap-3 mt-2">
+      {moderationBar}
       <Button label="Back to Hall of Fame" variant="secondary" onPress={goBackToHallOfFame} fullWidth />
     </View>
   );
@@ -157,7 +334,7 @@ export default function HallOfFamePublicReportScreen() {
       <View className="flex-1 px-4">
         <ReportDetailView
           report={state.report}
-          bottomPadding={insets.bottom + 120}
+          bottomPadding={insets.bottom + 160}
           footer={footer}
         />
       </View>

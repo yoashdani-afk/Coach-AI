@@ -30,9 +30,11 @@ import {
   getProPlans,
   presentProCustomerCenter,
   purchaseProPlan,
+  restoreProPurchases,
   type ProPlan,
   type ProPlanKind,
 } from '@/lib/revenueCat';
+import { openExternalUrl, PRIVACY_POLICY_URL, TERMS_OF_USE_URL } from '@/lib/ugcSafety';
 
 type PaywallReason = 'analyses' | 'hof' | 'weekly' | 'default';
 
@@ -167,7 +169,7 @@ export default function ProScreen() {
   const [livePlans, setLivePlans] = useState<ProPlan[]>([]);
   const [plansLoading, setPlansLoading] = useState(canPurchase);
   const [selectedKind, setSelectedKind] = useState<ProPlanKind>('monthly');
-  const [busyAction, setBusyAction] = useState<'subscribe' | 'manage' | null>(null);
+  const [busyAction, setBusyAction] = useState<'subscribe' | 'manage' | 'restore' | null>(null);
 
   const loadPlans = useCallback(async () => {
     if (!canPurchase) {
@@ -257,6 +259,33 @@ export default function ProScreen() {
     } finally {
       setBusyAction(null);
     }
+  };
+
+  const handleRestore = async () => {
+    if (isWeb) {
+      showNotice(
+        'Restore on mobile',
+        'Open GoalX on iOS or Android to restore purchases for this Apple/Google account.'
+      );
+      return;
+    }
+    setBusyAction('restore');
+    try {
+      const result = await restoreProPurchases();
+      if (result.restored) {
+        showNotice('Purchases restored', 'Your Pro access is unlocked on this account.');
+      } else {
+        showNotice('Nothing to restore', result.message ?? 'No Pro subscription found.');
+      }
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const openLegal = (url: string) => {
+    void openExternalUrl(url).catch(() => {
+      showNotice('Could not open link', url);
+    });
   };
 
   if (isPro) {
@@ -456,7 +485,28 @@ export default function ProScreen() {
             fullWidth
             size="lg"
           />
+          <Button
+            label="Restore purchases"
+            variant="ghost"
+            onPress={() => void handleRestore()}
+            loading={busyAction === 'restore'}
+            disabled={busyAction !== null}
+            fullWidth
+          />
           <Button label="Not now" variant="ghost" onPress={leavePaywall} fullWidth />
+          <Text className="text-text-muted text-[11px] leading-4 text-center px-2">
+            Payment is charged to your Apple ID. Subscription renews unless cancelled at least 24
+            hours before the period ends. Manage in Settings → Apple ID → Subscriptions.
+          </Text>
+          <View className="flex-row items-center justify-center gap-3 flex-wrap">
+            <Pressable onPress={() => openLegal(PRIVACY_POLICY_URL)} className="active:opacity-70">
+              <Text className="text-primary text-xs font-semibold">Privacy Policy</Text>
+            </Pressable>
+            <Text className="text-text-muted text-xs">·</Text>
+            <Pressable onPress={() => openLegal(TERMS_OF_USE_URL)} className="active:opacity-70">
+              <Text className="text-primary text-xs font-semibold">Terms of Use</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </View>

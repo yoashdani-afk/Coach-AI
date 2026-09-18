@@ -28,6 +28,7 @@ import {
 } from '@/lib/hallOfFame/supabaseMapper';
 import { uploadHallOfFameVideo } from '@/lib/hallOfFame/uploadVideo';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { getBlockedUserIds, getReportedEntryIds } from '@/lib/ugcSafety';
 import { useAuthStore } from '@/stores/authStore';
 import { useEntitlementStore } from '@/stores/entitlementStore';
 import type { CoachingReport } from '@/types/analysis';
@@ -132,15 +133,24 @@ export const useHallOfFameStore = create<HallOfFameState>((set, get) => ({
       if (globalRes.error) throw new Error(globalRes.error.message);
       if (userRes.error) throw new Error(userRes.error.message);
 
-      const globalSubmissions = ((globalRes.data ?? []) as HallOfFameEntryRow[]).map((row) =>
-        rowToGoalSubmission(row, SUPABASE_URL)
-      );
+      const globalSubmissions = ((globalRes.data ?? []) as HallOfFameEntryRow[])
+        .map((row) => rowToGoalSubmission(row, SUPABASE_URL));
       const userSubmissions = ((userRes.data ?? []) as HallOfFameEntryRow[]).map((row) =>
         rowToGoalSubmission(row, SUPABASE_URL)
       );
 
+      const [blockedUsers, reportedEntries] = await Promise.all([
+        getBlockedUserIds(),
+        getReportedEntryIds(),
+      ]);
+      const visibleGlobal = globalSubmissions.filter((s) => {
+        if (s.ownerUserId && blockedUsers.has(s.ownerUserId)) return false;
+        if (reportedEntries.has(s.id)) return false;
+        return true;
+      });
+
       set({
-        globalSubmissions,
+        globalSubmissions: visibleGlobal,
         userSubmissions,
         isLoading: false,
         hasHydrated: true,
