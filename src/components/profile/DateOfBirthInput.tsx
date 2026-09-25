@@ -185,7 +185,7 @@ export function DateOfBirthInput({ value, onChange, hideLabel = false }: DateOfB
   return (
     <View className="gap-3">
       {!hideLabel ? (
-        <Text className="text-text-secondary text-sm font-medium">Date of birth *</Text>
+        <Text className="text-text-secondary text-sm font-medium">Date of birth (optional)</Text>
       ) : null}
 
       <View className="flex-row gap-3">

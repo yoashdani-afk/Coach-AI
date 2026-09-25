@@ -129,11 +129,16 @@ function asBool(value: unknown): boolean | null {
   return null;
 }
 
-/** True when every required expanded-profile field is present and valid. */
+/** True when every required expanded-profile field is present and valid.
+ * Date of birth and nationality are optional (App Store 5.1.1(v)).
+ */
 export function isExpandedProfileComplete(profile: PlayerProfile): boolean {
   if (profile.firstName.trim().length < 2) return false;
-  if (!isValidIsoDateString(profile.dateOfBirth) || !isAgeInValidBand(profile.dateOfBirth)) return false;
-  if (profile.nationality.trim().length < 2) return false;
+  if (profile.dateOfBirth) {
+    if (!isValidIsoDateString(profile.dateOfBirth) || !isAgeInValidBand(profile.dateOfBirth)) {
+      return false;
+    }
+  }
   if (profile.countryPlayingIn.trim().length < 2) return false;
   if (profile.yearsPlayingFootball < 0 || profile.yearsInPrimaryPosition < 0) return false;
   if (profile.yearsInPrimaryPosition > profile.yearsPlayingFootball) return false;
@@ -145,7 +150,7 @@ export function isExpandedProfileComplete(profile: PlayerProfile): boolean {
 
 /**
  * Migrate persisted profile JSON to the expanded schema.
- * Does NOT invent dateOfBirth — missing DOB marks profile incomplete.
+ * Missing DOB / nationality is allowed (optional fields).
  */
 export function migrateStoredProfile(raw: unknown): PlayerProfile | null {
   if (!raw || typeof raw !== 'object') return null;

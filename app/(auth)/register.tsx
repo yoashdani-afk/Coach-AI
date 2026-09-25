@@ -33,8 +33,11 @@ export default function RegisterScreen() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const dateOfBirth = isoFromDateParts(dobParts);
+  const hasDob = isDateOfBirthValid(dobParts);
   const age =
-    dateOfBirth && isValidIsoDateString(dateOfBirth) ? calculateAge(dateOfBirth) : null;
+    hasDob && dateOfBirth && isValidIsoDateString(dateOfBirth)
+      ? calculateAge(dateOfBirth)
+      : null;
   const requiresParentEmail = age != null && Number.isFinite(age) && age < 13;
 
   const validationError = useMemo(() => {
@@ -43,7 +46,11 @@ export default function RegisterScreen() {
     if (password.length < MIN_PASSWORD_LENGTH) {
       return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
     }
-    if (!isDateOfBirthValid(dobParts)) return 'Enter a valid date of birth.';
+    // Date of birth is optional (App Store 5.1.1(v)). If provided, it must be valid.
+    const hasAnyDob = dobParts.day.trim() || dobParts.month.trim() || dobParts.year.trim();
+    if (hasAnyDob && !isDateOfBirthValid(dobParts)) {
+      return 'Enter a valid date of birth, or leave it blank.';
+    }
     if (requiresParentEmail) {
       if (!parentEmail.trim()) {
         return 'Parent/guardian email is required if you are under 13.';
@@ -73,13 +80,14 @@ export default function RegisterScreen() {
       const supabase = getSupabase();
       const trimmedEmail = email.trim().toLowerCase();
       const parentGuardianEmail = requiresParentEmail ? parentEmail.trim().toLowerCase() : null;
+      const dobValue = hasDob ? dateOfBirth : null;
 
       const { data, error } = await supabase.auth.signUp({
         email: trimmedEmail,
         password,
         options: {
           data: {
-            date_of_birth: dateOfBirth,
+            date_of_birth: dobValue,
             parent_guardian_email: parentGuardianEmail,
           },
         },
@@ -107,7 +115,7 @@ export default function RegisterScreen() {
       const { error: profileError } = await supabase.from('profiles').upsert(
         {
           id: userId,
-          date_of_birth: dateOfBirth,
+          date_of_birth: dobValue,
           parent_guardian_email: parentGuardianEmail,
           updated_at: new Date().toISOString(),
         },
@@ -175,6 +183,10 @@ export default function RegisterScreen() {
             editable={!loading}
           />
           <DateOfBirthInput value={dobParts} onChange={setDobParts} />
+          <Text className="text-text-muted text-xs -mt-2 leading-4">
+            Optional. Only needed if you want age-appropriate coaching. Required parent email only
+            if you enter a date of birth under 13.
+          </Text>
           {requiresParentEmail ? (
             <View className="gap-1.5">
               <Input

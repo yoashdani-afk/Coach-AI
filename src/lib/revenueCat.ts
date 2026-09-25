@@ -146,6 +146,7 @@ function proPurchaseAnchorDate(info: CustomerInfo): string {
 
 function applyCustomerInfo(info: CustomerInfo): boolean {
   const entitlement = useEntitlementStore.getState();
+  const previouslyPro = entitlement.hasProEntitlement;
   const active = hasActiveProEntitlement(info);
   entitlement.setHasProEntitlement(active);
   entitlement.setLastError(null);
@@ -161,18 +162,31 @@ function applyCustomerInfo(info: CustomerInfo): boolean {
         return;
       }
 
-      // New anchor: first sync on this install → re-anchor only.
-      // Purchase date changed (renewal / re-subscribe) → reset usage for a fresh allotment.
-      const resetUsed = lastSynced != null;
+      // Free → Pro (still on free allotment): reset used for a full Pro month.
+      // Already Pro (renewal) or cancel→resubscribe with sticky Pro allotment: never wipe used.
+      const stickyLimit = useProfileStore.getState().analysesMonthlyLimit || 1;
+      const resetUsed = !previouslyPro && stickyLimit <= getAnalysisLimit(false);
       await syncAnalysisPeriodAnchorRemote(anchor, resetUsed, getAnalysisLimit(true));
       useEntitlementStore.getState().setLastSyncedProPurchaseAnchor(anchor);
-      console.log('[Credits] Pro period sync', { anchor, lastSynced, resetUsed });
+      console.log('[Credits] Pro period sync', {
+        anchor,
+        lastSynced,
+        previouslyPro,
+        stickyLimit,
+        resetUsed,
+      });
       await useProfileStore.getState().refreshAnalysisUsage(getAnalysisLimit(true));
       return;
     }
 
-    useEntitlementStore.getState().setLastSyncedProPurchaseAnchor(null);
-    await useProfileStore.getState().refreshAnalysisUsage(getAnalysisLimit(false));
+    // Pro cancelled / expired: keep sticky period allotment + used until anniversary rollover.
+    // Pass current sticky limit (not free 1) so mid-period cancel cannot shrink remaining credits.
+    // Do not clear lastSynced — avoids treating a later refresh as a brand-new Pro period.
+    const stickyLimit = Math.max(
+      useProfileStore.getState().analysesMonthlyLimit || 1,
+      getAnalysisLimit(false)
+    );
+    await useProfileStore.getState().refreshAnalysisUsage(stickyLimit);
   })();
 
   return active;

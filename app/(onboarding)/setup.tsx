@@ -161,8 +161,16 @@ const STEP_META: {
   footerHint?: string;
 }[] = [
   { title: "What's your first name?" },
-  { title: "What's your date of birth?", subtitle: 'We use this to keep coaching age-appropriate.' },
-  { title: "What's your nationality?" },
+  {
+    title: "What's your date of birth?",
+    subtitle: 'Optional — helps keep coaching age-appropriate. You can skip this.',
+    footerHint: 'Optional',
+  },
+  {
+    title: "What's your nationality?",
+    subtitle: 'Optional — you can skip this.',
+    footerHint: 'Optional',
+  },
   { title: 'Which country do you play in?' },
   {
     title: 'Current club or team?',
@@ -229,10 +237,16 @@ export default function ProfileSetupScreen() {
     switch (s) {
       case 1:
         return draft.firstName.trim().length >= 2;
-      case 2:
+      case 2: {
+        const hasAny =
+          draft.dobParts.day.trim() ||
+          draft.dobParts.month.trim() ||
+          draft.dobParts.year.trim();
+        if (!hasAny) return true;
         return isDateOfBirthValid(draft.dobParts);
+      }
       case 3:
-        return draft.nationality.trim().length >= 2;
+        return true;
       case 4:
         return draft.countryPlayingIn.trim().length >= 2;
       case 5:
@@ -301,8 +315,13 @@ export default function ProfileSetupScreen() {
       return;
     }
 
-    const dateOfBirth = isoFromDateParts(draft.dobParts);
-    const age = calculateAge(dateOfBirth);
+    const dateOfBirthRaw = isoFromDateParts(draft.dobParts);
+    const hasValidDob =
+      Boolean(dateOfBirthRaw) &&
+      isDateOfBirthValid(draft.dobParts) &&
+      !Number.isNaN(calculateAge(dateOfBirthRaw));
+    const dateOfBirth = hasValidDob ? dateOfBirthRaw : '';
+    const age = hasValidDob ? calculateAge(dateOfBirth) : 0;
     const heightSource =
       draft.heightDisplayUnit === 'cm'
         ? draft.heightInput
@@ -359,6 +378,15 @@ export default function ProfileSetupScreen() {
     void finishSetup();
   };
 
+  const handleSkipOptional = () => {
+    if (step === 2) {
+      setDraft((d) => ({ ...d, dobParts: { day: '', month: '', year: '' } }));
+    } else if (step === 3) {
+      setDraft((d) => ({ ...d, nationality: '' }));
+    }
+    setStep(nextStepFrom(step));
+  };
+
   const handleBack = () => {
     if (step > 1) {
       setStep(prevStepFrom(step));
@@ -391,6 +419,8 @@ export default function ProfileSetupScreen() {
       continueDisabled={!canContinue}
       continueLoading={false}
       continueLabel={step === TOTAL_STEPS ? (isEditMode ? 'Save profile' : 'Finish setup') : 'Continue'}
+      showSkip={step === 2 || step === 3}
+      onSkip={handleSkipOptional}
     >
       {step === 1 ? (
         <Input

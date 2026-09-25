@@ -68,6 +68,7 @@ export function levelBaseScore(level: PlayerProfile['playingLevel']): number {
 }
 
 export function ageAdjustment(age: number, category: 'COMPOSURE' | 'COMMUNICATION' | 'DEFAULT'): number {
+  if (!Number.isFinite(age) || age <= 0) return 0;
   if (category === 'COMPOSURE' || category === 'COMMUNICATION') {
     if (age < 14) return -0.6;
     if (age < 17) return -0.3;

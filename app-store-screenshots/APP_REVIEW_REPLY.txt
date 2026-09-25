@@ -1,0 +1,59 @@
+GoalX — App Review notes / Resolution Center reply
+====================================================
+Paste into: App Store Connect → App Review Information → Notes
+AND into the Resolution Center Reply to Guideline 2.1.
+
+
+1) SCREEN RECORDING
+Attach a screen recording from a physical iPhone (latest iOS) of this TestFlight build.
+Recording starts at the home screen → launch GoalX, then shows:
+- Login with the demo account below
+- Home → Upload a clip → pick a football video (10s–5min) → identify player → analysis → open Coaching report
+- Pro / paid features (open Pro paywall; Restore purchases is available)
+- Hall of Fame → open another user’s Global Leaderboard entry → Report and/or Block (bottom of report)
+- Profile → Delete account (use a throwaway account for deletion in the video if needed; keep the demo account below intact for reviewers)
+
+
+2) PURPOSE AND TARGET AUDIENCE
+GoalX is an AI football (soccer) coaching app for players and academy athletes.
+Users upload match or training clips and receive AI analysis, scores, and coaching guidance to improve performance.
+It solves the problem of limited access to personal coaching feedback by delivering fast, clip-based insights on phone.
+
+
+3) HOW TO ACCESS / TEST
+Sign-in required: Yes
+Username: applereview78@gmail.com
+Password: (use the password already saved in App Review Information)
+
+Steps:
+1. Log in with the demo account (profile is complete; analysis credits available).
+2. Home → “Upload a clip” → select any football training/match clip (MP4, about 10 seconds to 5 minutes).
+3. Choose coaching mode (e.g. Rate This Goal / Analyze My Performance).
+4. Tap the player in the frame to identify them, then start analysis.
+5. Open the Coaching report when ready.
+6. Hall of Fame → Global Leaderboard → open an entry → scroll to bottom for Report / Block user.
+7. Profile → Pro / subscription management; paywall includes Restore purchases, Privacy Policy, Terms of Use.
+8. Account deletion: Profile → Delete account (permanent).
+
+Sample files: any short football clip from Photos is fine. No special sample file is required.
+
+
+4) EXTERNAL SERVICES
+- Supabase — authentication, profiles, Hall of Fame data/storage, usage tracking
+- RevenueCat + Apple In-App Purchase — GoalX Pro subscriptions
+- Google Gemini API — AI video analysis
+- Railway-hosted analysis backend — video processing / analysis pipeline
+- FormSubmit — email notifications for Hall of Fame content reports (also stored in Supabase ugc_reports)
+
+
+5) REGIONAL DIFFERENCES
+The app functions consistently across all regions. There are no region-specific feature or content differences.
+
+
+6) REGULATED INDUSTRY / PROTECTED MATERIAL
+GoalX is not in a highly regulated industry. Users upload their own football clips; we do not redistribute licensed broadcast feeds or protected third-party sports media.
+
+
+Contact: dan@blsl.net
+Privacy Policy: https://goalx.site/privacy
+Terms of Use: Apple Standard EULA (linked in-app) + https://www.goalx.site (site Terms)

@@ -1,0 +1,31 @@
+App Review reply — Sep 25, 2026 (5.1.1(v) + 2.1(b) IAP)
+=======================================================
+
+Hello App Review Team,
+
+Thank you for the feedback. We have addressed both issues as follows.
+
+Guideline 5.1.1(v) — Date of birth and nationality
+--------------------------------------------------
+We updated the app so Date of birth and Nationality are no longer required.
+
+- Registration: date of birth is optional (parent/guardian email is only requested if a user voluntarily enters a DOB under 13).
+- Profile setup: both Date of birth and Nationality steps are skippable (“Skip for now”).
+- Profile completion no longer depends on these fields.
+- A new binary including these changes is submitted with this response.
+
+Guideline 2.1(b) — In-App Purchase products
+-------------------------------------------
+GoalX Pro is offered only via Apple In-App Purchase (auto-renewable subscriptions), managed with RevenueCat.
+
+We have submitted the associated In-App Purchase products for review in App Store Connect (with App Review screenshots) together with this new binary.
+
+Demo account (unchanged):
+Username: applereview78@gmail.com
+Password: as listed in App Review Information
+
+Please let us know if you need anything else.
+
+Best regards,
+Daniel Yoash
+dan@blsl.net
